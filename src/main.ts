@@ -182,6 +182,31 @@ document.querySelectorAll<HTMLButtonElement>("button.chip").forEach((btn) => {
   });
 });
 
+// ---- wordmark: click through to the station's site -------------------------
+// Both faces' logos link out to ltbr.fm. They sit inside a drag region (the
+// faceplate doubles as the window's drag handle, see DRAG_REGIONS below) —
+// data-tauri-drag-region only intercepts an actual drag gesture, so a plain
+// click still reaches this handler, same as the update-available "tx" block.
+function openHomePage() {
+  cmd("open_home_page");
+}
+
+for (const sel of [".brand", ".vbrand .vname"]) {
+  document.querySelectorAll<HTMLElement>(sel).forEach((el) => {
+    el.classList.add("clickable");
+    el.title = "Open ltbr.fm";
+    el.setAttribute("role", "link");
+    el.setAttribute("tabindex", "0");
+    el.addEventListener("click", openHomePage);
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openHomePage();
+      }
+    });
+  });
+}
+
 // ---- transport + state -----------------------------------------------------
 
 const txState = document.getElementById("txState")!;
@@ -340,6 +365,58 @@ function setEqVisible(v: boolean) {
 
 btnEq.addEventListener("click", () => setEqVisible(!eqVisible));
 
+// ---- minimised view ---------------------------------------------------------
+// A compact "mini bar" for both faces: the scroller/spectrum window, the
+// equaliser and the source row (default face) or the VU meters, tuning dial
+// and tuning knob (vintage face) drop out of view, leaving a strip about a
+// quarter of the full faceplate's footprint. Nothing about the engine
+// changes — playback, mute, volume and any EQ settings already dialled in
+// keep running; only the chrome is tucked away. Expanding brings the full
+// face straight back for tuning or tweaking. Each face remembers its own
+// choice across launches, same as the EQ visibility above.
+const btnMini = document.getElementById("btnMini")!;
+const vMini = document.getElementById("vMini")!;
+let minimized = false;
+// The width to restore when expanding again — captured the moment we shrink,
+// since the window is otherwise always the width the current face settled on.
+let normalWidth: number | null = null;
+
+const MINI_KEY = "ltbrfm.mini."; // + face id
+const MINI_WIDTH = 320;
+
+function savedMinimized(f: FaceId): boolean {
+  try {
+    return localStorage.getItem(MINI_KEY + f) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setMinimized(v: boolean) {
+  if (v && !minimized) normalWidth = window.innerWidth;
+  minimized = v;
+  document.body.classList.toggle("mini", v);
+  for (const btn of [btnMini, vMini]) {
+    btn.setAttribute("aria-pressed", String(v));
+    btn.setAttribute("title", v ? "Expand" : "Minimise");
+    btn.setAttribute("aria-label", v ? "Expand to full view" : "Minimise view");
+  }
+  btnMini.querySelector(".ico-collapse")!.toggleAttribute("hidden", v);
+  btnMini.querySelector(".ico-expand")!.toggleAttribute("hidden", !v);
+  try {
+    localStorage.setItem(MINI_KEY + currentFace(), v ? "1" : "0");
+  } catch {
+    /* private mode — the choice just won't persist */
+  }
+  requestAnimationFrame(() => {
+    fitWindow().catch((e) => console.error("fitWindow failed:", e));
+  });
+}
+
+btnMini.addEventListener("click", () => setMinimized(!minimized));
+// The vintage face drives the same shared toggle (mirrors the EQ key above).
+vMini.addEventListener("click", () => (btnMini as HTMLButtonElement).click());
+
 document.getElementById("btnTune")!.addEventListener("click", () => {
   const url = streamUrl.value.trim();
   if (!url) {
@@ -488,8 +565,9 @@ getVersion()
 
 onFaceChange((f) => {
   refreshFaceChecks(f);
-  // each face carries its own remembered EQ visibility
+  // each face carries its own remembered EQ visibility and mini state
   setEqVisible(savedEqVisible(f));
+  setMinimized(savedMinimized(f));
   // returning to the default face: reflect the shared player state in its
   // controls (the vintage knob may have moved the volume meanwhile)
   if (f === "default") {
@@ -524,18 +602,34 @@ player.onSpectrum((bars) => setSpectrum(bars));
 // others. Measure the real content and size the window to it exactly.
 //
 // Measuring is only trustworthy once the bundled fonts are loaded AND the
-// webview viewport has caught up with the native window — at boot (notably
+// webview viewport has caught up with the *target* width — at boot (notably
 // macOS/WKWebView) the first frames render before either is true, and a
 // measurement taken then sees a wrapped layout and locks in a squeezed
-// window. Wait for both, and take the width from the native window, never
-// from the viewport.
+// window. The same trap bites when toggling the mini bar: reading content
+// height right after changing width class(es) still reflects the OLD
+// viewport width (the native window hasn't resized yet), so it sees a
+// wrapped/inflated layout unless we wait for the viewport to actually
+// reach the target width first.
 async function fitWindow(attempt = 0) {
   const face = document.querySelector(".face") as HTMLElement;
   if (!face) return;
   await document.fonts.ready;
   const win = getCurrentWindow();
-  const width = (await win.innerSize()).toLogical(await win.scaleFactor()).width;
-  if (Math.abs(window.innerWidth - width) > 1) {
+
+  // The width we're aiming for: a fixed compact bar while minimised, the
+  // previously-captured full width when restoring it, or (first boot, never
+  // having been minimised) whatever the OS already gave the window.
+  const desiredWidth = minimized
+    ? MINI_WIDTH
+    : normalWidth ?? (await win.innerSize()).toLogical(await win.scaleFactor()).width;
+
+  if (Math.abs(window.innerWidth - desiredWidth) > 1) {
+    if (attempt === 0) {
+      // Command the width now; height is corrected in a follow-up pass
+      // once the viewport has actually caught up — measuring at the old
+      // width would see a wrapped, artificially tall layout.
+      await win.setSize(new LogicalSize(desiredWidth, window.innerHeight));
+    }
     // Viewport not settled yet — retry for up to ~1s, else leave the
     // configured size alone rather than resize from a bad measurement.
     if (attempt < 60) {
@@ -545,13 +639,14 @@ async function fitWindow(attempt = 0) {
     }
     return;
   }
+
   // Measure whichever face is active: the default fascia plus the unit
   // border, or the vintage receiver's full case.
   const target = currentFace() === "vintage"
     ? Math.ceil(document.getElementById("faceVintage")!.offsetHeight)
     : Math.ceil(face.offsetHeight) + 2; // + unit border
   if (Math.abs(window.innerHeight - target) > 1) {
-    await win.setSize(new LogicalSize(width, target));
+    await win.setSize(new LogicalSize(desiredWidth, target));
   }
 }
 

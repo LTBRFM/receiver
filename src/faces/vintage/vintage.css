@@ -53,6 +53,9 @@
   white-space:nowrap;
 }
 .vbrand .vname i{ font-style:normal; color:#8f2f1d }
+.vbrand .vname.clickable{ cursor:pointer }
+.vbrand .vname.clickable:hover{ color:#8f2f1d }
+.vbrand .vname.clickable:focus-visible{ outline:2px solid #8f2f1d; outline-offset:3px; border-radius:2px }
 .vbrand small{
   font-size:8px; font-weight:600; letter-spacing:.32em; text-transform:uppercase;
   color:#57503f;
@@ -245,3 +248,28 @@ body.face-vintage .eq.hidden{ display:none }
 @media (prefers-reduced-motion: reduce){
   .vknob-cap{ transition:none }
 }
+
+/* ---------- Minimised view (vintage face) ----------
+   Hides the tuning dial and equaliser, and drops the tuning knob (retuning
+   needs the full fascia back) — leaving the brand strip, the VU meters
+   (shrunk, channel labels dropped to save space), the Power/Mute/Mini keys
+   (shrunk) and the volume knob (shrunk), still about a quarter of the
+   receiver's normal footprint. Powering, muting and any held tuning all
+   keep running exactly as before; only the chrome is tucked away. */
+body.mini.face-vintage .vunit{ width:320px; padding:10px 12px }
+body.mini.face-vintage .vface{ padding:14px 18px 16px }
+body.mini.face-vintage .vbrand small,
+body.mini.face-vintage .vdial-bezel,
+body.mini.face-vintage .vgroup-tune,
+body.mini.face-vintage #vEq,
+body.mini.face-vintage #veqSlot{ display:none }
+body.mini.face-vintage .vtop{ margin-bottom:10px }
+body.mini.face-vintage .vmeters{ gap:8px }
+body.mini.face-vintage .vmeter{ width:78px; height:38px; padding:2px }
+body.mini.face-vintage .vcontrols{ margin-top:0; gap:12px }
+body.mini.face-vintage .vkeys{ gap:5px }
+body.mini.face-vintage button.vkey{ min-width:40px; height:24px; font-size:7px; letter-spacing:.12em }
+body.mini.face-vintage button.vkey .vdot{ width:5px; height:5px; top:4px; right:5px }
+body.mini.face-vintage .vgroup .vlbl{ font-size:7px }
+body.mini.face-vintage .vknob{ width:40px; height:40px }
+body.mini.face-vintage .vbrand .vname{ font-size:19px }

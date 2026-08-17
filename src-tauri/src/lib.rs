@@ -63,6 +63,11 @@ fn open_download_page() {
     update::open_download_page();
 }
 
+#[tauri::command]
+fn open_home_page() {
+    update::open_external(update::HOME_PAGE);
+}
+
 /// Quit the whole app, not just the window — the audio engine dies with the
 /// process, so no teardown is needed beyond exiting.
 #[tauri::command]
@@ -97,6 +102,7 @@ pub fn run() {
             set_preamp,
             apply_preset,
             open_download_page,
+            open_home_page,
             show_window_menu,
             quit,
         ])

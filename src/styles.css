@@ -115,6 +115,10 @@ body{
 }
 .brand .dot{ color:var(--amber) }
 .brand .fm{ color:rgba(244,239,230,.55) }
+.brand.clickable{ cursor:pointer }
+.brand.clickable:hover{ color:var(--amber) }
+.brand.clickable:hover .fm{ color:rgba(255,155,33,.55) }
+.brand.clickable:focus-visible{ outline:2px solid var(--focus); outline-offset:3px; border-radius:2px }
 .strap{
   font-size:9px; letter-spacing:.34em; text-transform:uppercase;
   color:var(--concrete-dim); flex:1; white-space:nowrap;
@@ -198,6 +202,34 @@ button.power:active{
   box-shadow:0 2px 4px rgba(0,0,0,.7) inset, 0 0 0 1px #0d0b09;
 }
 button.power:focus-visible{ outline:2px solid var(--focus); outline-offset:2px }
+
+/* ---------- Minimise / expand key ---------- */
+
+button.mini{
+  width:26px;height:26px; margin-left:4px;
+  border:none; border-radius:50%; cursor:pointer; padding:0;
+  background:radial-gradient(circle at 35% 30%, #564d43, #332d27 55%, #201c17 100%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.14) inset,
+    0 -1px 2px rgba(0,0,0,.5) inset,
+    0 2px 3px rgba(0,0,0,.55),
+    0 0 0 1px #0d0b09;
+  display:flex; align-items:center; justify-content:center;
+  color:#8a8175;
+  transition:color .15s, box-shadow .15s, transform .05s;
+}
+button.mini svg{ width:12px;height:12px }
+button.mini:hover{
+  color:var(--amber);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.14) inset,
+    0 -1px 2px rgba(0,0,0,.5) inset,
+    0 2px 3px rgba(0,0,0,.55),
+    0 0 6px rgba(255,155,33,.35),
+    0 0 0 1px #0d0b09;
+}
+button.mini:active{ transform:translateY(1px) }
+button.mini:focus-visible{ outline:2px solid var(--focus); outline-offset:2px }
 
 /* ---------- Display windows ---------- */
 
@@ -433,6 +465,28 @@ button.ctx-item[aria-checked="true"] .ctx-led{
   background:var(--amber);
   box-shadow:0 0 5px rgba(255,155,33,.8), 0 0 0 1px rgba(0,0,0,.4) inset;
 }
+
+/* ---------- Minimised view (default face) ----------
+   Dropping the scroller/spectrum window, the equaliser and the source row
+   leaves just the brand strip and a slim transport bar — about a quarter
+   of the full faceplate's footprint. The engine and any EQ settings are
+   untouched; the panels are only detached from view. */
+body.mini:not(.face-vintage) .unit{ width:320px }
+body.mini:not(.face-vintage) .face{ padding:16px 20px 18px }
+body.mini:not(.face-vintage) .strap,
+body.mini:not(.face-vintage) .windows,
+body.mini:not(.face-vintage) .eq,
+body.mini:not(.face-vintage) .source,
+body.mini:not(.face-vintage) .fault,
+body.mini:not(.face-vintage) #btnStop,
+body.mini:not(.face-vintage) #btnEq,
+body.mini:not(.face-vintage) .meta .lbl,
+body.mini:not(.face-vintage) .vol .lbl{ display:none }
+body.mini:not(.face-vintage) .brand-row{ padding-bottom:10px }
+body.mini:not(.face-vintage) .transport{ margin-top:12px; gap:12px; flex-wrap:nowrap }
+body.mini:not(.face-vintage) .meta{ flex:1 1 auto; min-width:0 }
+body.mini:not(.face-vintage) .vol{ margin-left:0 }
+body.mini:not(.face-vintage) .fader-h{ width:82px }
 
 @media (prefers-reduced-motion: reduce){
   *{ animation:none !important; transition:none !important }

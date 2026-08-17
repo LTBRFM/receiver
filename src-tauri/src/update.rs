@@ -9,6 +9,7 @@ use tauri::{AppHandle, Emitter};
 
 const LATEST_URL: &str = "https://www.ltbr.fm/api/player/latest";
 pub const DOWNLOAD_PAGE: &str = "https://www.ltbr.fm/player#download";
+pub const HOME_PAGE: &str = "https://www.ltbr.fm";
 
 /// How often to re-check while the app is running.
 const CHECK_INTERVAL: Duration = Duration::from_secs(4 * 60 * 60);
@@ -73,7 +74,12 @@ fn is_newer(latest: &str, current: &str) -> bool {
 
 /// Open the download page in the system browser.
 pub fn open_download_page() {
-    let url = DOWNLOAD_PAGE;
+    open_external(DOWNLOAD_PAGE);
+}
+
+/// Open an arbitrary URL in the system browser (used e.g. for the wordmark
+/// linking out to the station's site).
+pub fn open_external(url: &str) {
     #[cfg(target_os = "linux")]
     let _ = std::process::Command::new("xdg-open").arg(url).spawn();
     #[cfg(target_os = "macos")]

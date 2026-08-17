@@ -75,6 +75,13 @@ export class VUMeter {
     const c = cv.getContext("2d")!;
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     const { px, py, r } = this.pivot();
+    // Scale factor against the meter's default size (128x78), clamped so
+    // legends stay readable at both the full and the shrunk (mini-view)
+    // dimensions.
+    const s = Math.max(0.42, Math.min(w / 128, h / 78));
+    // The channel name ("LEFT"/"RIGHT") only fits above a certain size —
+    // below it, drop straight to just "VU" to save space.
+    const showChannel = h >= 55;
 
     // aged-cream face with a soft vignette
     const bg = c.createRadialGradient(w / 2, h * 0.3, 6, w / 2, h * 0.6, w * 0.75);
@@ -99,7 +106,7 @@ export class VUMeter {
     c.stroke();
 
     // ticks + labels
-    c.font = "700 7px 'Inter', sans-serif";
+    c.font = `700 ${Math.max(6, Math.round(7 * s))}px 'Inter', sans-serif`;
     c.textAlign = "center";
     for (const [t, lbl] of STOPS) {
       const a = angOf(t) - Math.PI / 2;
@@ -129,13 +136,19 @@ export class VUMeter {
     }
 
     // legend — channel name stacked over "VU", centred in the free area
-    // between the scale arc and the bottom edge
+    // between the scale arc and the bottom edge. Below a certain size the
+    // channel name is dropped (kept to just "VU") so it doesn't crowd or
+    // overrun the shrunk meter face used in the minimised view.
     c.fillStyle = "#2b241a";
-    c.font = "700 7px 'Inter', sans-serif";
-    c.textAlign = "center";
-    c.fillText(this.label, w / 2, h - 17);
-    c.font = "800 9px 'Inter', sans-serif";
-    c.fillText("VU", w / 2, h - 7);
+    if (showChannel) {
+      c.font = `700 ${Math.max(6, Math.round(7 * s))}px 'Inter', sans-serif`;
+      c.fillText(this.label, w / 2, h - 17 * s);
+      c.font = `800 ${Math.max(7, Math.round(9 * s))}px 'Inter', sans-serif`;
+      c.fillText("VU", w / 2, h - 7 * s);
+    } else {
+      c.font = `800 ${Math.max(7, Math.round(9 * s))}px 'Inter', sans-serif`;
+      c.fillText("VU", w / 2, h - 6 * s);
+    }
 
     return cv;
   }
