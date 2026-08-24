@@ -173,6 +173,27 @@
   <div class="ctx-version" id="ctxVersion" aria-hidden="true"></div>
 </div>
 
+<!-- Auto-update overlay: shown only while an update is actually downloading
+     or installing; the whole flow is driven from Rust via update://state. -->
+<div class="upd" id="updOverlay" hidden role="alertdialog" aria-live="assertive"
+     aria-label="Updating the receiver">
+  <div class="upd-panel">
+    <div class="upd-title">
+      <span class="upd-led"></span><span id="updTitle">Receiving update…</span>
+    </div>
+    <div class="upd-bar" id="updBar">
+      <div class="upd-fill" id="updFill"></div>
+      <div class="upd-sheen"></div>
+    </div>
+    <div class="upd-meta">
+      <span id="updPct">0%</span>
+      <span id="updBytes"></span>
+    </div>
+    <div class="upd-note" id="updNote">A new version is being tuned in — the receiver
+      will restart by itself.</div>
+  </div>
+</div>
+
 <script type="module" src="./main.ts"></script>
 </body>
 </html>

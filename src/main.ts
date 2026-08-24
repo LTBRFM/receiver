@@ -256,6 +256,60 @@ listen<{ version: string }>("update_available", () => {
   refreshTx();
 });
 
+// ---- auto-update overlay ----------------------------------------------------
+//
+// Where the install can replace itself, Rust downloads and installs a new
+// version automatically on startup and restarts the app. This block only
+// *renders* that: the overlay appears on the first `downloading` event,
+// switches to an installing message, and hides again on `dismiss` (a failed
+// download — the current version simply keeps playing).
+
+const updOverlay = document.getElementById("updOverlay")!;
+const updTitle = document.getElementById("updTitle")!;
+const updBar = document.getElementById("updBar")!;
+const updFill = document.getElementById("updFill") as HTMLElement;
+const updPct = document.getElementById("updPct")!;
+const updBytes = document.getElementById("updBytes")!;
+const updNote = document.getElementById("updNote")!;
+
+function fmtMB(bytes: number): string {
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+listen<{ phase: string; downloaded: number; total: number | null }>(
+  "update://state",
+  ({ payload }) => {
+    if (payload.phase === "dismiss") {
+      updOverlay.hidden = true;
+      return;
+    }
+    updOverlay.hidden = false;
+
+    if (payload.phase === "installing") {
+      updTitle.textContent = "Installing…";
+      updNote.textContent = "Rewiring the receiver — it will restart in a moment.";
+      updBar.classList.add("indeterminate");
+      updPct.textContent = "";
+      updBytes.textContent = "";
+      return;
+    }
+
+    // downloading
+    updTitle.textContent = "Receiving update…";
+    if (payload.total && payload.total > 0) {
+      const pct = Math.min(100, (payload.downloaded / payload.total) * 100);
+      updBar.classList.remove("indeterminate");
+      updFill.style.width = pct.toFixed(1) + "%";
+      updPct.textContent = Math.floor(pct) + "%";
+      updBytes.textContent = fmtMB(payload.downloaded) + " / " + fmtMB(payload.total);
+    } else {
+      updBar.classList.add("indeterminate");
+      updPct.textContent = "";
+      updBytes.textContent = fmtMB(payload.downloaded);
+    }
+  },
+);
+
 function hostOf(u: string): string {
   try {
     return new URL(u).hostname;

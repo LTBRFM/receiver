@@ -28,8 +28,18 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE4OTFCMDcyNzYzQTc0QjIKUldTeWREcDJjckNScU5CUjFJT0dISmdPNlFBTFlSODJjOG5QM2ZGZ3RzTVJQZUU2Uk9iZmFrcTIK",
+      "endpoints": ["https://www.ltbr.fm/api/player/updater"],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "category": "Music",
     "shortDescription": "LTBR·FM Receiver",

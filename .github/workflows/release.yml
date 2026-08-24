@@ -81,6 +81,15 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # ---- Updater signing ----
+          # With bundle.createUpdaterArtifacts enabled, tauri-action signs
+          # every bundle with this minisign key and uploads the `.sig` files
+          # plus a `latest.json` manifest to the release. The running app
+          # verifies downloads against the matching public key embedded in
+          # tauri.conf.json, and www.ltbr.fm/api/player/updater proxies the
+          # manifest to the app.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # ---- Code signing (optional) ----
           # IMPORTANT: only uncomment these once the secrets actually exist.
           # Passing them while empty makes the bundler attempt to import a

@@ -109,6 +109,29 @@ git push origin v0.1.0
 Produced artifacts: `.dmg` (macOS, Intel + Apple Silicon), `.msi` and NSIS
 `.exe` (Windows), and `.AppImage` / `.deb` / `.rpm` (Linux).
 
+### Automatic updates
+
+The Receiver updates itself. Shortly after every start it checks the signed
+update manifest at `https://www.ltbr.fm/api/player/updater` (a cached proxy of
+the `latest.json` that the release workflow attaches to each GitHub release)
+and, when a newer version exists, downloads it, verifies the minisign
+signature against the public key embedded in `tauri.conf.json`, installs it in
+place, and restarts — showing a progress overlay while it happens. No clicks
+required; a failed check or download is silent and the current version keeps
+playing (re-checked every 4 hours).
+
+This works everywhere the installation can replace itself: macOS `.app`,
+the Windows installers, and Linux AppImage. On `.deb`/`.rpm` installs the
+package manager owns the files, so those keep the passive behavior: the
+front-panel indicator lights up when a new version exists and clicking it
+opens the download page.
+
+Release requirements: the `TAURI_SIGNING_PRIVATE_KEY` and
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` repository secrets must hold the minisign
+key matching the `plugins.updater.pubkey` in `tauri.conf.json` — the private
+key lives outside the repository and must never be committed. Losing it means
+shipped apps can no longer verify (and therefore install) any future update.
+
 ### Code signing
 
 Binaries are **unsigned** by default, which triggers OS warnings on first

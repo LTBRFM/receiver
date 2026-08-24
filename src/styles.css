@@ -498,3 +498,102 @@ body.mini:not(.face-vintage) .fader-h{ width:82px }
   .vol{ margin-left:0; width:100% }
   .fader-v{ height:74px }
 }
+
+/* ---------- Auto-update overlay ---------- */
+/* Smoked glass over the whole fascia while a new version is tuned in.
+   Everything below is inert — the flow is automatic and cannot be cancelled,
+   so the overlay swallows all pointer input until the app restarts. */
+
+.upd{
+  position:fixed; inset:0; z-index:200;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(6,5,4,.82);
+  backdrop-filter:blur(2px);
+  -webkit-backdrop-filter:blur(2px);
+  animation:upd-in .25s ease-out;
+}
+.upd[hidden]{ display:none }
+
+@keyframes upd-in{ from{ opacity:0 } to{ opacity:1 } }
+
+.upd-panel{
+  width:400px; padding:22px 26px 18px;
+  background:linear-gradient(180deg, var(--face-hi) 0%, var(--face) 12%, var(--face-lo) 100%);
+  border:1px solid var(--ink); border-radius:4px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.08) inset,
+    0 0 0 1px rgba(255,155,33,.08),
+    0 18px 48px rgba(0,0,0,.75);
+}
+
+.upd-title{
+  display:flex; align-items:center; gap:10px;
+  color:var(--amber);
+  font-size:11px; letter-spacing:.28em; text-transform:uppercase;
+  text-shadow:0 0 8px rgba(255,155,33,.45);
+  margin-bottom:16px;
+}
+
+/* Pulsing amber transmission LED, same family as the tx indicator. */
+.upd-led{
+  width:8px; height:8px; border-radius:50%;
+  background:var(--amber);
+  box-shadow:0 0 6px var(--amber), 0 0 14px rgba(255,155,33,.5);
+  animation:upd-led 1.1s ease-in-out infinite;
+}
+@keyframes upd-led{
+  0%,100%{ opacity:1 }
+  50%{ opacity:.35 }
+}
+
+/* Recessed LED bar: the fill is drawn as discrete amber segments, matching
+   the spectrum analyser rather than a smooth web-style progress bar. */
+.upd-bar{
+  position:relative; height:16px; overflow:hidden;
+  background:var(--ink);
+  border-radius:2px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.06),
+    0 2px 6px rgba(0,0,0,.8) inset;
+}
+.upd-fill{
+  position:absolute; inset:2px auto 2px 2px; width:0%;
+  background:
+    repeating-linear-gradient(90deg,
+      var(--amber) 0, var(--amber) 5px,
+      transparent 5px, transparent 8px);
+  box-shadow:0 0 10px rgba(255,155,33,.55);
+  transition:width .15s linear;
+}
+/* Unknown size: a sweeping carrier-scan instead of an invented percentage. */
+.upd-bar.indeterminate .upd-fill{
+  width:30%;
+  animation:upd-scan 1.2s ease-in-out infinite alternate;
+  transition:none;
+}
+@keyframes upd-scan{
+  from{ left:2px }
+  to{ left:calc(70% - 2px) }
+}
+/* Faint glass reflection across the bar window. */
+.upd-sheen{
+  position:absolute; inset:0;
+  background:linear-gradient(180deg, rgba(255,255,255,.10), transparent 45%);
+  pointer-events:none;
+}
+
+.upd-meta{
+  display:flex; justify-content:space-between;
+  margin-top:8px;
+  color:var(--concrete);
+  font-family:"LTBR Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  font-size:10px; letter-spacing:.08em;
+}
+.upd-meta #updPct{ color:var(--amber) }
+
+.upd-note{
+  margin-top:14px;
+  color:var(--concrete-dim);
+  font-size:9px; letter-spacing:.18em; text-transform:uppercase;
+  line-height:1.7;
+}
