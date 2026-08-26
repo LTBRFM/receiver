@@ -131,3 +131,17 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+  invalidate-cache:
+    name: Invalidate player cache
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      # /api/player/latest and /api/player/updater are cached on www.ltbr.fm;
+      # bust that cache immediately so clients see the new release instead of
+      # waiting for the cache to expire naturally.
+      - name: Revalidate player cache
+        run: |
+          curl --fail --show-error --silent -X POST \
+            https://www.ltbr.fm/api/player/revalidate \
+            -H "Authorization: Bearer ${{ secrets.PLAYER_RELEASE_TOKEN_CACHE_INVALID }}"
