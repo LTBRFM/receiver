@@ -36,8 +36,11 @@ export function setFace(f: FaceId) {
 
 export function savedFace(): FaceId {
   try {
-    return localStorage.getItem(KEY) === "vintage" ? "vintage" : "default";
+    const saved = localStorage.getItem(KEY);
+    if (saved === "default" || saved === "vintage") return saved;
+    // No stored preference yet — new users land on the Vintage 80s face.
+    return "vintage";
   } catch {
-    return "default";
+    return "vintage";
   }
 }

@@ -109,15 +109,9 @@ jobs:
           releaseBody: |
             ### What's new
 
-            - **Exit from the right-click menu.** The context menu now ends
-              with an Exit item that quits the whole app, with the running
-              version stamped (debossed, like the rest of the fascia) below it.
-            - **Each face remembers its EQ panel.** Hiding or showing the
-              equaliser is now saved per face and restored on the next launch,
-              so a compact vintage receiver and a full default rack can
-              coexist.
-            - Menu separators are actually visible now — the divider style had
-              never been defined.
+            - **Vintage 80s is now the default face.** New installs open on
+              the backlit tuning-dial receiver instead of the rack unit;
+              existing users' saved face choice is unaffected.
 
             ### Downloads
 
