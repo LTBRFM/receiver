@@ -21,14 +21,6 @@
         <svg class="info" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1.2 15h-2.4v-6.5h2.4V17zm0-8.5h-2.4V6h2.4v2.5z"/></svg>
         <span class="led"></span><span id="txLabel">Standby</span>
       </div>
-      <button class="mini" id="btnMini" aria-pressed="false" title="Minimise" aria-label="Minimise view">
-        <svg class="ico-collapse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 9h6V3"/><path d="M20 15h-6v6"/><path d="M10 9L3 2"/><path d="M14 15l7 7"/>
-        </svg>
-        <svg class="ico-expand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" hidden>
-          <path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>
-        </svg>
-      </button>
       <button class="power" id="btnPower" title="Power off" aria-label="Power off">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
           <path d="M12 3.5v7.5"/>
@@ -38,7 +30,7 @@
     </div>
 
     <div class="windows">
-      <div class="window w-scroll"><canvas id="scroller" height="46"></canvas></div>
+      <div class="window w-scroll"><canvas id="scroller" height="78"></canvas></div>
       <div class="window w-spec"><canvas id="spectrum" height="78"></canvas></div>
     </div>
 
@@ -129,8 +121,6 @@
                   title="Mute" aria-label="Mute">MUTE</button>
           <button class="vkey" id="vEq"
                   title="Graphic equaliser" aria-label="Show or hide the graphic equaliser">EQ</button>
-          <button class="vkey" id="vMini" aria-pressed="false"
-                  title="Minimise" aria-label="Minimise view">MINI</button>
         </div>
         <span class="vlbl">Function</span>
       </div>
@@ -165,6 +155,9 @@
   </button>
   <button class="ctx-item" id="ctxFaceVintage" role="menuitemradio" aria-checked="false">
     <span class="ctx-led"></span>Face: Vintage 80s
+  </button>
+  <button class="ctx-item" id="ctxFaceMini" role="menuitemradio" aria-checked="false">
+    <span class="ctx-led"></span>Face: Mini
   </button>
   <div class="ctx-sep"></div>
   <button class="ctx-item" id="ctxExit" role="menuitem">

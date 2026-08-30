@@ -25,7 +25,7 @@ const scr = document.getElementById("scroller") as HTMLCanvasElement;
 const rctx = scr.getContext("2d")!;
 
 let specDims = { w: 196, h: 78 };
-let scrDims = { w: 300, h: 46 };
+let scrDims = { w: 300, h: 78 };
 
 function fitCanvas(cv: HTMLCanvasElement, cssW: number) {
   const dpr = window.devicePixelRatio || 1;
@@ -53,6 +53,7 @@ export function resize() {
   specDims = fitCanvas(spec, specParentW > 400 ? 196 : Math.min(196, specParentW));
   spec.style.width = specDims.w + "px";
   scrDims = fitCanvas(scr, scr.parentElement!.clientWidth - 22);
+  buildGrid();
 }
 
 // ---- spectrum --------------------------------------------------------------
@@ -200,7 +201,7 @@ const ALIASES: Record<string, string> = {
   "–": "-", "—": "-", "•": "·", "…": ".",
 };
 
-function rasterise(text: string) {
+function rasterise(text: string): { bits: Uint8Array; w: number } {
   const t = "   " + text + "   ";
   // Uppercase and strip diacritics so e.g. "Édith" renders as "EDITH";
   // anything still unknown becomes a blank cell.
@@ -208,51 +209,117 @@ function rasterise(text: string) {
     t.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""),
   ).map((ch) => ALIASES[ch] ?? ch);
 
-  matrixW = chars.length * GLYPH_STEP;
-  matrix = new Uint8Array(matrixW * ROWS);
+  const w = chars.length * GLYPH_STEP;
+  const bits = new Uint8Array(w * ROWS);
   chars.forEach((ch, i) => {
     const glyph = FONT[ch] ?? FONT[" "];
     for (let y = 0; y < ROWS; y++) {
-      const bits = glyph[y];
+      const row = glyph[y];
       for (let x = 0; x < GLYPH_W; x++) {
-        if (bits & (1 << (GLYPH_W - 1 - x))) {
-          matrix![y * matrixW + i * GLYPH_STEP + x] = 1;
-        }
+        if (row & (1 << (GLYPH_W - 1 - x))) bits[y * w + i * GLYPH_STEP + x] = 1;
       }
     }
   });
+  return { bits, w };
 }
 
-let matrix: Uint8Array | null = null;
-let matrixW = 0;
-let scrollX = 0;
-let scrollText = "";
+// The panel is two independent 7-row bands. Each keeps its own bitmap and its
+// own scroll offset, but both advance at the same rate — differing speeds make
+// the two lines visibly beat against one another instead of reading as one
+// display.
+interface Line {
+  bits: Uint8Array | null;
+  w: number;
+  x: number;
+  text: string;
+}
 
+const LINES = 2;
+const LINE_GAP = 6; // unlit rows between the two bands
+const DOT = 3, DOT_GAP = 1, PITCH = DOT + DOT_GAP;
+const BAND_H = ROWS * PITCH - DOT_GAP;
+const LIT = "#ff9b21";
+const UNLIT = "#241705";
+
+const lines: Line[] = Array.from({ length: LINES }, () => ({
+  bits: null,
+  w: 0,
+  x: 0,
+  text: "",
+}));
+
+/** Vertical origin of band `i`, both bands centred as a group. */
+function bandTop(i: number, h: number): number {
+  const total = BAND_H * LINES + LINE_GAP * (LINES - 1);
+  return Math.round((h - total) / 2) + i * (BAND_H + LINE_GAP);
+}
+
+export function setLine(i: number, text: string) {
+  const line = lines[i];
+  if (!line || text === line.text) return; // same text never restarts the scroll
+  line.text = text;
+  const { bits, w } = rasterise(text);
+  line.bits = bits;
+  line.w = w;
+  line.x = 0;
+}
+
+/** Back-compat alias: the top line is the primary one. */
 export function setScroll(text: string) {
-  if (text === scrollText) return;
-  scrollText = text;
-  rasterise(text);
-  scrollX = 0;
+  setLine(0, text);
+}
+
+// The unlit grid never changes between resizes, so it is pre-rendered once to
+// an offscreen canvas and blitted per frame — the same trick dial.ts and vu.ts
+// use for their printed layers. Painting every cell inline was already ~770
+// fillRects a frame with one line; two lines would have doubled it.
+let grid: HTMLCanvasElement | null = null;
+
+function buildGrid() {
+  const { w, h } = scrDims;
+  if (w <= 0 || h <= 0) return;
+  const dpr = window.devicePixelRatio || 1;
+  const cv = document.createElement("canvas");
+  cv.width = Math.round(w * dpr);
+  cv.height = Math.round(h * dpr);
+  const c = cv.getContext("2d")!;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.fillStyle = UNLIT;
+  const cols = Math.floor(w / PITCH);
+  for (let i = 0; i < LINES; i++) {
+    const yTop = bandTop(i, h);
+    for (let cx = 0; cx < cols; cx++) {
+      for (let y = 0; y < ROWS; y++) {
+        c.fillRect(cx * PITCH, yTop + y * PITCH, DOT, DOT);
+      }
+    }
+  }
+  grid = cv;
 }
 
 function drawScroller(dt: number) {
   const { w, h } = scrDims;
   rctx.clearRect(0, 0, w, h);
-  if (!matrix) return;
+  if (grid) rctx.drawImage(grid, 0, 0, w, h);
 
-  const dot = 3, gap = 1, pitch = dot + gap;
-  const cols = Math.floor(w / pitch);
-  const yTop = Math.round((h - (ROWS * pitch - gap)) / 2);
+  const cols = Math.floor(w / PITCH);
+  rctx.fillStyle = LIT;
 
-  for (let cx = 0; cx < cols; cx++) {
-    const mx = (Math.floor(scrollX) + cx) % matrixW;
-    for (let y = 0; y < ROWS; y++) {
-      const on = matrix[y * matrixW + ((mx + matrixW) % matrixW)];
-      rctx.fillStyle = on ? "#ff9b21" : "#241705";
-      rctx.fillRect(cx * pitch, yTop + y * pitch, dot, dot);
+  for (let i = 0; i < LINES; i++) {
+    const line = lines[i];
+    if (!line.bits || line.w <= 0) continue;
+    const yTop = bandTop(i, h);
+    const off = Math.floor(line.x);
+    for (let cx = 0; cx < cols; cx++) {
+      const mx = (((off + cx) % line.w) + line.w) % line.w;
+      for (let y = 0; y < ROWS; y++) {
+        if (line.bits[y * line.w + mx]) {
+          rctx.fillRect(cx * PITCH, yTop + y * PITCH, DOT, DOT);
+        }
+      }
     }
+    if (playing || tuning) line.x += dt * 0.022;
   }
-  if (playing || tuning) scrollX += dt * 0.022;
 }
 
 // ---- draw loop -------------------------------------------------------------

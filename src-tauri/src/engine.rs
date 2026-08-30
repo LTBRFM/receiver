@@ -24,7 +24,9 @@ use tauri::{AppHandle, Emitter};
 use crate::dsp::{Controls, Dsp, NUM_BANDS};
 use crate::output::Output;
 use crate::spectrum::Spectrum;
-use crate::stream::{self, BytePipe, PipeReader};
+use crate::icy;
+use crate::stream::{self, BytePipe, PipeReader, StationInfo};
+use crate::sync::{self, Drift};
 
 const RESAMPLE_CHUNK: usize = 1024;
 
@@ -40,9 +42,161 @@ enum Cmd {
     Stop,
 }
 
+/// Errors the demuxer may raise on the first frames after a deliberate trim,
+/// before it finds its footing again. Bounded so a genuinely broken stream
+/// still surfaces as a fault.
+const SPLICE_TOLERANCE: u32 = 8;
+
 #[derive(serde::Serialize, Clone)]
 struct NowPlaying {
     title: String,
+}
+
+#[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct StationPayload {
+    name: String,
+    description: String,
+    genre: String,
+    url: String,
+    bitrate_kbps: u32,
+}
+
+/// The full metadata set, emitted when a block's audio reaches the speakers.
+///
+/// `playhead_ms` is the station's own timeline position for the audio being
+/// heard *right now* — because release is playback-aligned, the frontend can
+/// anchor on it and interpolate forward to run a live countdown to the next
+/// track without any clock synchronisation or extra request.
+#[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct MetadataPayload {
+    title: String,
+    /// track | jingle | talk | off | hb
+    kind: String,
+    seq: u64,
+    playhead_ms: i64,
+    item_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    station: Option<StationPayload>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    programme: Option<icy::Daypart>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    now: Option<icy::Segment>,
+    next: Vec<icy::Segment>,
+    talk: Vec<icy::Talk>,
+    jingles: Vec<icy::Jingle>,
+    /// True when the schedule was dropped to fit the block's byte cap. The
+    /// lists are then empty because we were not told, NOT because nothing is
+    /// coming up — a display must not render those the same way.
+    schedule_truncated: bool,
+}
+
+#[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct SyncPayload {
+    /// End-to-end listener lag. `None` until the connection settles; may be
+    /// negative if the listener's clock runs behind the station's.
+    lag_ms: Option<i64>,
+    /// Lag growth since this connection settled — constant clock skew cancels
+    /// out of this, which is why the controller reasons about it.
+    excess_ms: Option<i64>,
+    /// Our own buffers only. Always available, even with metadata off.
+    buffer_ms: u64,
+    buffer_bytes: u64,
+    bitrate_kbps: u32,
+    target_ms: u64,
+    ceiling_ms: u64,
+    state: String,
+    /// none | catchup | reconnect
+    action: String,
+    dropped_ms: u64,
+    catchups: u32,
+    reconnects: u32,
+}
+
+fn emit_sync(app: &AppHandle, drift: &Drift, action: &str) {
+    let r = drift.report();
+    let _ = app.emit(
+        "sync",
+        SyncPayload {
+            lag_ms: r.lag_ms,
+            excess_ms: r.excess_ms,
+            buffer_ms: r.buffer_ms,
+            buffer_bytes: r.buffer_bytes,
+            bitrate_kbps: r.bitrate_kbps,
+            target_ms: sync::TARGET_LAG_MS,
+            ceiling_ms: sync::CEILING_MS,
+            state: r.state.as_str().to_string(),
+            action: action.to_string(),
+            dropped_ms: r.dropped_ms,
+            catchups: r.catchups,
+            reconnects: r.reconnects,
+        },
+    );
+}
+
+fn station_payload(info: &StationInfo, bitrate_kbps: u32) -> StationPayload {
+    StationPayload {
+        name: info.name.clone(),
+        description: info.description.clone(),
+        genre: info.genre.clone(),
+        url: info.url.clone(),
+        bitrate_kbps,
+    }
+}
+
+/// Publish one released block. Returns the title if it should become the new
+/// "now playing" string.
+fn emit_block(
+    app: &AppHandle,
+    block: &icy::Block,
+    drift: &mut Drift,
+    last_title: &mut String,
+    station: Option<StationPayload>,
+    now_ms: u64,
+) {
+    if let Some(url) = &block.url {
+        if drift.on_block(url, now_ms) == sync::BlockVerdict::StaleSeq {
+            return;
+        }
+    }
+
+    // De-duplicate the title here rather than in the demuxer: heartbeats and
+    // DJ-talk blocks repeat it deliberately, and the drift measurement needs
+    // every single one of them.
+    if !block.title.is_empty() && block.title != *last_title {
+        *last_title = block.title.clone();
+        let _ = app.emit(
+            "nowplaying",
+            NowPlaying {
+                title: block.title.clone(),
+            },
+        );
+    }
+
+    let url = block.url.as_ref();
+    let payload = url.map(|u| u.payload.as_ref());
+    let _ = app.emit(
+        "metadata",
+        MetadataPayload {
+            title: block.title.clone(),
+            kind: url.map_or_else(String::new, |u| u.kind.clone()),
+            seq: url.map_or(0, |u| u.seq),
+            playhead_ms: url.map_or(0, |u| u.playhead_ms),
+            item_id: url.map_or_else(String::new, |u| u.item_id.clone()),
+            station,
+            programme: payload.flatten().and_then(|p| p.daypart.clone()),
+            now: payload.flatten().and_then(|p| p.now.clone()),
+            next: payload.flatten().map(|p| p.next.clone()).unwrap_or_default(),
+            talk: payload.flatten().map(|p| p.talk.clone()).unwrap_or_default(),
+            jingles: payload
+                .flatten()
+                .map(|p| p.jingles.clone())
+                .unwrap_or_default(),
+            schedule_truncated: url.is_some() && payload.flatten().is_none(),
+        },
+    );
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -147,25 +301,28 @@ fn run_session(url: &str, stop: Arc<AtomicBool>, controls: &Arc<Controls>, app: 
 
         let pipe = BytePipe::new();
         let attempt_stop = Arc::new(AtomicBool::new(false));
+        // Filled in by the network thread the moment the headers land; the
+        // decode loop reads it to name the station and seed the bitrate.
+        let station: Arc<Mutex<Option<StationInfo>>> = Arc::new(Mutex::new(None));
 
         // combined stop for the network thread
         let net_stop = Arc::new(AtomicBool::new(false));
         let net_handle = {
             let url = url.to_string();
             let pipe = pipe.clone();
-            let app = app.clone();
             let net_stop = net_stop.clone();
+            let station = station.clone();
             thread::Builder::new()
                 .name("ltbr-net".into())
                 .spawn(move || {
-                    let _ = stream::run(&url, net_stop, pipe, |title| {
-                        let _ = app.emit("nowplaying", NowPlaying { title });
+                    let _ = stream::run(&url, net_stop, pipe, |info| {
+                        *station.lock().unwrap() = Some(info);
                     });
                 })
                 .ok()
         };
 
-        let outcome = decode_loop(&pipe, &stop, &attempt_stop, controls, &mut out, app);
+        let outcome = decode_loop(&pipe, &station, &stop, &attempt_stop, controls, &mut out, app);
 
         // Tear the attempt down.
         attempt_stop.store(true, Ordering::SeqCst);
@@ -181,6 +338,13 @@ fn run_session(url: &str, stop: Arc<AtomicBool>, controls: &Arc<Controls>, app: 
 
         match outcome {
             DecodeOutcome::Ended => backoff_ms = 500,
+            // A resync we chose, not a stream that broke: no fault banner, and
+            // no backoff growth — the whole point is to land back on the burst
+            // as quickly as possible.
+            DecodeOutcome::Resync => {
+                backoff_ms = 500;
+                emit_state(app, "tuning", Some("re-syncing…"));
+            }
             DecodeOutcome::Failed(msg) => {
                 emit_state(app, "tuning", Some(&format!("reconnecting… ({msg})")));
                 let _ = app.emit(
@@ -202,11 +366,14 @@ fn run_session(url: &str, stop: Arc<AtomicBool>, controls: &Arc<Controls>, app: 
 
 enum DecodeOutcome {
     Ended,
+    /// Drift could not be trimmed away; reconnect deliberately.
+    Resync,
     Failed(String),
 }
 
 fn decode_loop(
     pipe: &Arc<BytePipe>,
+    station: &Arc<Mutex<Option<StationInfo>>>,
     stop: &AtomicBool,
     attempt_stop: &AtomicBool,
     controls: &Arc<Controls>,
@@ -246,6 +413,29 @@ fn decode_loop(
     let mut sample_buf: Option<SampleBuffer<f32>> = None;
     let mut live = false;
 
+    let in_rate = track.codec_params.sample_rate.unwrap_or(44_100).max(1) as u64;
+
+    // Exact byte cursor for the demux point. An MP3 packet is its header plus
+    // frame body with nothing in between, so summing packet lengths tracks the
+    // demuxer precisely. The pipe's own read position cannot be used: symphonia
+    // keeps an internal read-ahead of up to 32 KB (~2s) that is neither
+    // visible nor shrinkable — `buffer_len` is asserted to be a power of two
+    // AND larger than the block size.
+    let mut demuxed: u64 = 0;
+
+    // Drift lives per attempt, so every reconnect re-settles and re-baselines
+    // from scratch — which is exactly right after a suspend/resume, where the
+    // clock jumped and the socket usually died anyway.
+    let seed_bitrate = station.lock().unwrap().as_ref().map_or(0, |s| s.bitrate_kbps);
+    let mut drift = Drift::new(seed_bitrate);
+    let mut last_title = String::new();
+    let mut station_sent = false;
+    let mut splice_errors_left: u32 = 0;
+    let mut last_sync_emit: u64 = 0;
+    // Rolling window for measuring the real byte rate; the production mount
+    // does not send `icy-br` despite advertising it, and this is exact anyway.
+    let (mut rate_bytes, mut rate_frames) = (0u64, 0u64);
+
     loop {
         if stop.load(Ordering::Relaxed) || attempt_stop.load(Ordering::Relaxed) {
             return DecodeOutcome::Ended;
@@ -254,8 +444,28 @@ fn decode_loop(
         let packet = match format.next_packet() {
             Ok(p) => p,
             Err(SymError::IoError(_)) => return DecodeOutcome::Ended,
+            // A catch-up splices the byte stream, so the demuxer stumbles on
+            // the first frame or two afterwards. That is our own doing, not a
+            // broken stream — never surface it as a fault.
+            Err(SymError::DecodeError(_) | SymError::ResetRequired)
+                if splice_errors_left > 0 =>
+            {
+                splice_errors_left -= 1;
+                continue;
+            }
             Err(e) => return DecodeOutcome::Failed(format!("read: {e}")),
         };
+        demuxed += packet.data.len() as u64;
+        rate_bytes += packet.data.len() as u64;
+        rate_frames += packet.dur();
+        if rate_frames >= in_rate * 2 {
+            let ms = rate_frames * 1000 / in_rate;
+            if ms > 0 {
+                drift.set_bitrate((rate_bytes * 8 / ms) as u32);
+            }
+            rate_bytes = 0;
+            rate_frames = 0;
+        }
         if packet.track_id() != track_id {
             continue;
         }
@@ -292,6 +502,48 @@ fn decode_loop(
         if !live {
             live = true;
             emit_state(app, "live", None);
+            drift.first_packet(sync::wall_ms());
+        }
+
+        // Metadata and drift are handled AFTER the (possibly blocking) push to
+        // the output, so a release is never held up by a full ring and the
+        // poll cadence is paced by real playback time.
+        let now = sync::wall_ms();
+        let tick = pipe.tick(demuxed);
+        if !tick.released.is_empty() {
+            let info = station
+                .lock()
+                .unwrap()
+                .as_ref()
+                .map(|i| station_payload(i, drift.bitrate_kbps()));
+            for block in &tick.released {
+                let with_station = if station_sent { None } else { info.clone() };
+                station_sent = true;
+                emit_block(app, block, &mut drift, &mut last_title, with_station, now);
+            }
+        }
+
+        match drift.poll(tick.depth_bytes, out.queued_ms(), now) {
+            sync::Action::None => {}
+            sync::Action::CatchUp { keep_bytes } => {
+                let trimmed = pipe.trim_to(keep_bytes, demuxed);
+                if trimmed.bytes > 0 {
+                    drift.on_trimmed(trimmed.bytes);
+                    splice_errors_left = SPLICE_TOLERANCE;
+                    last_sync_emit = now;
+                    emit_sync(app, &drift, "catchup");
+                }
+            }
+            sync::Action::Reconnect => {
+                emit_sync(app, &drift, "reconnect");
+                return DecodeOutcome::Resync;
+            }
+        }
+
+        // Keep the lag readout live without flooding the IPC.
+        if now.saturating_sub(last_sync_emit) >= 1000 {
+            last_sync_emit = now;
+            emit_sync(app, &drift, "none");
         }
     }
 }

@@ -203,34 +203,6 @@ button.power:active{
 }
 button.power:focus-visible{ outline:2px solid var(--focus); outline-offset:2px }
 
-/* ---------- Minimise / expand key ---------- */
-
-button.mini{
-  width:26px;height:26px; margin-left:4px;
-  border:none; border-radius:50%; cursor:pointer; padding:0;
-  background:radial-gradient(circle at 35% 30%, #564d43, #332d27 55%, #201c17 100%);
-  box-shadow:
-    0 1px 0 rgba(255,255,255,.14) inset,
-    0 -1px 2px rgba(0,0,0,.5) inset,
-    0 2px 3px rgba(0,0,0,.55),
-    0 0 0 1px #0d0b09;
-  display:flex; align-items:center; justify-content:center;
-  color:#8a8175;
-  transition:color .15s, box-shadow .15s, transform .05s;
-}
-button.mini svg{ width:12px;height:12px }
-button.mini:hover{
-  color:var(--amber);
-  box-shadow:
-    0 1px 0 rgba(255,255,255,.14) inset,
-    0 -1px 2px rgba(0,0,0,.5) inset,
-    0 2px 3px rgba(0,0,0,.55),
-    0 0 6px rgba(255,155,33,.35),
-    0 0 0 1px #0d0b09;
-}
-button.mini:active{ transform:translateY(1px) }
-button.mini:focus-visible{ outline:2px solid var(--focus); outline-offset:2px }
-
 /* ---------- Display windows ---------- */
 
 .windows{ display:flex; gap:12px; margin:16px 0 18px; flex-wrap:wrap }

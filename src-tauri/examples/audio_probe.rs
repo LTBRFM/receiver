@@ -15,6 +15,7 @@ use ltbrfm_player_lib::dsp::Controls;
 use ltbrfm_player_lib::engine::SessionState;
 use ltbrfm_player_lib::output::Output;
 use ltbrfm_player_lib::stream::{self, BytePipe, PipeReader};
+use ltbrfm_player_lib::sync;
 
 use symphonia::core::audio::SampleBuffer;
 use symphonia::core::codecs::DecoderOptions;
@@ -53,7 +54,12 @@ fn main() {
         let stop = stop.clone();
         let pipe = pipe.clone();
         thread::spawn(move || {
-            let _ = stream::run(&url, stop, pipe, |t| eprintln!("NOW PLAYING: {t}"));
+            let _ = stream::run(&url, stop, pipe, |info| {
+                eprintln!(
+                    "station: {} ({} kbps, metaint {})",
+                    info.name, info.bitrate_kbps, info.metaint
+                );
+            });
         });
     }
 
@@ -100,11 +106,35 @@ fn main() {
     let mut frames_total = 0u64;
     let mut non_finite = 0u64;
     let mut in_rate = 0u32;
+    // Byte cursor for the demux point, so metadata surfaces in step with the
+    // audio rather than seconds ahead of it — the same mechanism the engine
+    // uses, which makes this probe a live demonstration of it.
+    let mut demuxed = 0u64;
 
     let start = Instant::now();
     while start.elapsed() < Duration::from_secs(secs) {
         let packet = match format.next_packet() {
-            Ok(p) => p,
+            Ok(p) => {
+                demuxed += p.data.len() as u64;
+                let tick = pipe.tick(demuxed);
+                for block in tick.released {
+                    // Blocks are released when their audio reaches the
+                    // speakers, so this lag is what the listener actually
+                    // experiences — not merely the network's.
+                    let lag = block
+                        .url
+                        .as_ref()
+                        .map(|u| sync::wall_ms() as i64 - u.wall_ms);
+                    eprintln!(
+                        "[{:>6}] NOW PLAYING: {}  (lag {}, buffered {} ms)",
+                        tick.depth_bytes,
+                        block.title,
+                        lag.map_or("n/a".into(), |l| format!("{l} ms")),
+                        sync::bytes_to_ms(tick.depth_bytes, 128),
+                    );
+                }
+                p
+            }
             Err(e) => {
                 eprintln!("stream read ended: {e}");
                 break;

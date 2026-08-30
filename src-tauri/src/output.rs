@@ -4,7 +4,7 @@
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, SizedSample};
-use ringbuf::traits::{Consumer, Producer, Split};
+use ringbuf::traits::{Consumer, Observer, Producer, Split};
 use ringbuf::{HeapCons, HeapProd, HeapRb};
 
 pub struct Output {
@@ -62,6 +62,18 @@ impl Output {
     #[inline]
     pub fn push(&mut self, data: &[f32]) -> usize {
         self.prod.push_slice(data)
+    }
+
+    /// Audio already committed to the sound card, in milliseconds. Bounded by
+    /// RING_MS so it is always small — but it is the last term of the
+    /// end-to-end lag, and measuring it costs nothing next to assuming it.
+    #[inline]
+    pub fn queued_ms(&self) -> u64 {
+        let per_sec = (self.sample_rate as u64) * (self.channels as u64);
+        if per_sec == 0 {
+            return 0;
+        }
+        self.prod.occupied_len() as u64 * 1000 / per_sec
     }
 }
 

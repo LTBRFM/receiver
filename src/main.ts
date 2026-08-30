@@ -13,6 +13,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import {
   initVisuals,
+  setLine,
   setScroll,
   setSpectrum,
   setPlaying,
@@ -178,7 +179,7 @@ document.querySelectorAll<HTMLButtonElement>("button.chip").forEach((btn) => {
   btn.addEventListener("click", () => {
     const p = PRESETS[btn.dataset.preset!];
     p.forEach((val, i) => bandFaders[i].set(val));
-    setScroll("EQ · " + btn.textContent!.toUpperCase());
+    flashLine2("EQ · " + btn.textContent!.toUpperCase());
   });
 });
 
@@ -318,6 +319,176 @@ function hostOf(u: string): string {
   }
 }
 
+// ---- dot-matrix display -----------------------------------------------------
+//
+// Two bands. The top one is always what you are hearing — station, state and
+// the current track — and is never used for anything else. The bottom one is a
+// context belt: it cycles through whichever of the next track, the programme
+// and the DJ the station has actually told us about, and yields to transient
+// notices (DJ on air, a station ident, an EQ change, a resync).
+//
+// Everything below reads from the decoded ICY payload, which the engine
+// releases in step with the audio, so the countdown to the next track is
+// honest rather than an estimate.
+
+const STATION_FALLBACK = "LTBR·FM";
+const ROTATE_MS = 8000;
+const FLASH_MS = 3000;
+
+let rotation = 0;
+let rotateAt = 0;
+let flashText = "";
+let flashUntil = 0;
+
+/** Take the secondary line for a few seconds, then let it resume rotating. */
+function flashLine2(text: string) {
+  flashText = text;
+  flashUntil = Date.now() + FLASH_MS;
+  renderDisplay();
+}
+
+function stationName(): string {
+  return player.getStation()?.name || STATION_FALLBACK;
+}
+
+/** "ARTIST - TITLE", falling back to whichever half exists. */
+function segmentLabel(seg: player.Segment): string {
+  const artist = seg.artist?.trim();
+  const title = seg.title?.trim();
+  if (artist && title) return `${artist} - ${title}`;
+  return title || artist || "";
+}
+
+/** m:ss, or "<1:00" style seconds for very short gaps. Track durations vary
+ *  wildly — the station schedules idents only a few seconds long. */
+function countdown(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const m = Math.floor(total / 60);
+  const sec = total % 60;
+  return m > 0 ? `${m}:${String(sec).padStart(2, "0")}` : `${sec}S`;
+}
+
+/** Markers are on the station timeline, so "live" means the interpolated
+ *  listener position falls inside them. */
+function activeMarker<T extends { startMs: number; durationMs: number }>(
+  markers: T[],
+  now: number | null,
+): T | undefined {
+  if (now === null) return undefined;
+  return markers.find((m) => now >= m.startMs && now < m.startMs + m.durationMs);
+}
+
+/** The rotating context belt. Returns the candidates that actually have data,
+ *  so a station that sends no schedule simply shows fewer things rather than
+ *  blank slots. */
+function line2Candidates(): string[] {
+  const meta = player.getMetadata();
+  if (!meta) return [];
+  const out: string[] = [];
+  const now = player.timelineMs();
+
+  const next = meta.next[0];
+  if (next) {
+    const label = segmentLabel(next);
+    if (label) {
+      const eta = now !== null ? next.startMs - now : null;
+      out.push(
+        eta !== null && eta > 0
+          ? `NEXT · ${label} · IN ${countdown(eta)}`
+          : `NEXT · ${label}`,
+      );
+    }
+  } else if (meta.scheduleTruncated) {
+    // Told nothing, rather than told there is nothing.
+    out.push("NEXT · —");
+  }
+
+  const prog = meta.programme;
+  if (prog) {
+    const show = prog.showTitle?.trim() || prog.name?.trim();
+    const dj = prog.dj?.trim();
+    if (show && dj) out.push(`${show} · WITH ${dj}`);
+    else if (show) out.push(show);
+    else if (dj) out.push(`WITH ${dj}`);
+  }
+  return out;
+}
+
+/** Transient states that take the line immediately, ahead of the rotation. */
+function line2Override(): string | null {
+  if (Date.now() < flashUntil) return flashText;
+
+  const meta = player.getMetadata();
+  if (!meta) return null;
+  const now = player.timelineMs();
+
+  const talk = activeMarker(meta.talk, now);
+  if (talk || meta.kind === "talk") {
+    const dj = talk?.dj || meta.programme?.dj;
+    return dj ? `DJ ON AIR · ${dj}` : "DJ ON AIR";
+  }
+  // Jingle names are raw asset slugs (LTBR_FM_All_Day_..._01), so they are
+  // never shown verbatim.
+  if (activeMarker(meta.jingles, now) || meta.kind === "jingle") {
+    return "STATION IDENT";
+  }
+  return null;
+}
+
+function renderDisplay() {
+  if (engineState === "live") {
+    const meta = player.getMetadata();
+    const station = stationName().toUpperCase();
+
+    if (meta?.kind === "off") {
+      setLine(0, `${station} · OFF AIR ·`);
+      setLine(1, "");
+      return;
+    }
+
+    const label = meta?.now ? segmentLabel(meta.now) : "";
+    const heading = label || nowPlaying || hostOf(streamUrl.value);
+    setLine(0, `${station} · ON AIR · ${heading.toUpperCase()} ·`);
+
+    const override = line2Override();
+    if (override) {
+      setLine(1, override.toUpperCase() + " ·");
+      return;
+    }
+
+    const belt = line2Candidates();
+    if (belt.length === 0) {
+      setLine(1, "");
+      return;
+    }
+    const now = Date.now();
+    if (now >= rotateAt) {
+      rotateAt = now + ROTATE_MS;
+      rotation++;
+    }
+    setLine(1, belt[rotation % belt.length].toUpperCase() + " ·");
+    return;
+  }
+
+  if (engineState === "tuning") {
+    setLine(0, `${stationName().toUpperCase()} · TUNING ·`);
+    setLine(1, "STAND BY ·");
+  } else if (engineState === "error") {
+    setLine(0, `${stationName().toUpperCase()} · NO CARRIER ·`);
+    setLine(1, "RETRYING ·");
+  } else {
+    setScroll("LTBR FM · LONDON TOWER BLOCK RADIO · PRESS PLAY ·");
+    setLine(1, "");
+  }
+}
+
+// The countdown and the rotation both move on their own, so the display is
+// refreshed on a slow timer rather than only on engine events. One second is
+// as fine-grained as a m:ss readout can show.
+setInterval(() => {
+  if (engineState === "live") renderDisplay();
+}, 1000);
+
 function applyState(s: typeof engineState, message?: string) {
   engineState = s;
   const playing = s === "live" || s === "tuning";
@@ -337,21 +508,15 @@ function applyState(s: typeof engineState, message?: string) {
 
   if (s === "live") {
     metaVal.textContent = nowPlaying || hostOf(streamUrl.value);
-    setScroll(
-      nowPlaying
-        ? "LTBR FM · ON AIR · " + nowPlaying.toUpperCase() + " ·"
-        : "LTBR FM · ON AIR · " + hostOf(streamUrl.value).toUpperCase() + " ·",
-    );
   } else if (s === "tuning") {
     metaVal.textContent = message || "acquiring…";
-    setScroll("LTBR FM · TUNING · STAND BY ·");
   } else if (s === "error") {
     metaVal.textContent = "— no carrier —";
   } else {
     metaVal.textContent = message || "— no carrier —";
-    setScroll("LTBR FM · LONDON TOWER BLOCK RADIO · PRESS PLAY ·");
     clearSpectrum();
   }
+  renderDisplay();
 }
 
 function fault(msg: string) {
@@ -425,22 +590,30 @@ btnEq.addEventListener("click", () => setEqVisible(!eqVisible));
 // and tuning knob (vintage face) drop out of view, leaving a strip about a
 // quarter of the full faceplate's footprint. Nothing about the engine
 // changes — playback, mute, volume and any EQ settings already dialled in
-// keep running; only the chrome is tucked away. Expanding brings the full
-// face straight back for tuning or tweaking. Each face remembers its own
-// choice across launches, same as the EQ visibility above.
-const btnMini = document.getElementById("btnMini")!;
-const vMini = document.getElementById("vMini")!;
+// keep running; only the chrome is tucked away.
+//
+// Mini is chosen from the context menu's face list rather than from a key on
+// the faceplate, so it reads as the third face it effectively is — and the
+// fascias stay free of a control that is really about the window, not the
+// radio. It keeps the *base* face's styling (the mini strip looks quite
+// different on the rack unit and the vintage receiver), so the choice is a
+// single global preference rather than per-face state: picking Receiver or
+// Vintage from the same menu expands straight back to that face.
 let minimized = false;
 // The width to restore when expanding again — captured the moment we shrink,
 // since the window is otherwise always the width the current face settled on.
 let normalWidth: number | null = null;
 
-const MINI_KEY = "ltbrfm.mini."; // + face id
+const MINI_KEY = "ltbrfm.mini";
 const MINI_WIDTH = 320;
 
 function savedMinimized(f: FaceId): boolean {
   try {
-    return localStorage.getItem(MINI_KEY + f) === "1";
+    const v = localStorage.getItem(MINI_KEY);
+    if (v !== null) return v === "1";
+    // Migrate the old per-face key, so anyone who left the previous build
+    // minimised comes back minimised rather than unexpectedly expanded.
+    return localStorage.getItem(MINI_KEY + "." + f) === "1";
   } catch {
     return false;
   }
@@ -450,15 +623,9 @@ function setMinimized(v: boolean) {
   if (v && !minimized) normalWidth = window.innerWidth;
   minimized = v;
   document.body.classList.toggle("mini", v);
-  for (const btn of [btnMini, vMini]) {
-    btn.setAttribute("aria-pressed", String(v));
-    btn.setAttribute("title", v ? "Expand" : "Minimise");
-    btn.setAttribute("aria-label", v ? "Expand to full view" : "Minimise view");
-  }
-  btnMini.querySelector(".ico-collapse")!.toggleAttribute("hidden", v);
-  btnMini.querySelector(".ico-expand")!.toggleAttribute("hidden", !v);
+  refreshFaceChecks(currentFace());
   try {
-    localStorage.setItem(MINI_KEY + currentFace(), v ? "1" : "0");
+    localStorage.setItem(MINI_KEY, v ? "1" : "0");
   } catch {
     /* private mode — the choice just won't persist */
   }
@@ -466,10 +633,6 @@ function setMinimized(v: boolean) {
     fitWindow().catch((e) => console.error("fitWindow failed:", e));
   });
 }
-
-btnMini.addEventListener("click", () => setMinimized(!minimized));
-// The vintage face drives the same shared toggle (mirrors the EQ key above).
-vMini.addEventListener("click", () => (btnMini as HTMLButtonElement).click());
 
 document.getElementById("btnTune")!.addEventListener("click", () => {
   const url = streamUrl.value.trim();
@@ -586,18 +749,27 @@ ctxOnTop.addEventListener("click", () => {
 
 const ctxFaceDefault = document.getElementById("ctxFaceDefault")!;
 const ctxFaceVintage = document.getElementById("ctxFaceVintage")!;
+const ctxFaceMini = document.getElementById("ctxFaceMini")!;
 
+// One radio group of three. Mini is not a base face of its own — it wears
+// whichever fascia is underneath — so it simply wins the tick while it is on.
 function refreshFaceChecks(f: FaceId) {
-  ctxFaceDefault.setAttribute("aria-checked", String(f === "default"));
-  ctxFaceVintage.setAttribute("aria-checked", String(f === "vintage"));
+  ctxFaceDefault.setAttribute("aria-checked", String(f === "default" && !minimized));
+  ctxFaceVintage.setAttribute("aria-checked", String(f === "vintage" && !minimized));
+  ctxFaceMini.setAttribute("aria-checked", String(minimized));
 }
 
-ctxFaceDefault.addEventListener("click", () => {
-  setFace("default");
+/** Picking a full face expands, so the three items behave as one choice. */
+function chooseFace(f: FaceId) {
+  setMinimized(false);
+  setFace(f);
   closeCtxMenu();
-});
-ctxFaceVintage.addEventListener("click", () => {
-  setFace("vintage");
+}
+
+ctxFaceDefault.addEventListener("click", () => chooseFace("default"));
+ctxFaceVintage.addEventListener("click", () => chooseFace("vintage"));
+ctxFaceMini.addEventListener("click", () => {
+  setMinimized(true);
   closeCtxMenu();
 });
 
@@ -619,9 +791,8 @@ getVersion()
 
 onFaceChange((f) => {
   refreshFaceChecks(f);
-  // each face carries its own remembered EQ visibility and mini state
+  // each face carries its own remembered EQ visibility
   setEqVisible(savedEqVisible(f));
-  setMinimized(savedMinimized(f));
   // returning to the default face: reflect the shared player state in its
   // controls (the vintage knob may have moved the volume meanwhile)
   if (f === "default") {
@@ -642,6 +813,17 @@ player.onState((s, message) => {
 player.onNowPlaying((title) => {
   nowPlaying = title;
   if (engineState === "live") applyState("live");
+});
+
+player.onMetadata(() => {
+  // A fresh block can change either line — a new track, a new next-up, a DJ
+  // coming on air — so recompose rather than waiting for the tick.
+  if (engineState === "live") renderDisplay();
+});
+
+player.onSync((s) => {
+  if (s.action === "catchup") flashLine2("RESYNC · CATCHING UP");
+  else if (s.action === "reconnect") flashLine2("RESYNC · RETUNING");
 });
 
 player.onFault((m) => fault(m));
@@ -708,6 +890,7 @@ player.initPlayer();
 initVisuals();
 initVintage();
 setFace(savedFace());
+setMinimized(savedMinimized(currentFace()));
 applyState("standby");
 requestAnimationFrame(() => {
   fitWindow().catch((e) => console.error("fitWindow failed:", e));

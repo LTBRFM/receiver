@@ -25,14 +25,23 @@ desktop counterpart, downloadable from the same page.
 - **Artifact-free controls.** All gains (EQ, preamp, volume, mute) are smoothed
   on the audio thread, so dragging any slider — even fast, even to the
   extremes — produces **no clicks, pops or zipper noise**.
-- **Live spectrum + dot-matrix scroller** driven by the real post-EQ signal,
-  including the stream's ICY "now playing" track title.
+- **Live spectrum + two-line dot-matrix display** driven by the real post-EQ
+  signal. The top line carries the station and the current track; the bottom
+  line cycles through the next track with a live countdown, the programme and
+  the DJ on air — all decoded from the station's in-band ICY metadata.
+- **Stays on the live edge.** Metadata is released in step with the audio, so
+  the display never runs ahead of what you hear — and the same timing anchor
+  measures how far behind the live edge you are. Drift beyond 15s is trimmed
+  back to the ~8s target, falling back to a silent reconnect if trimming will
+  not hold.
 - **Resilient.** Automatic reconnection with backoff; a dropped network never
   crashes the app.
-- **Two faces.** Right-click → **Face** switches between the default rack unit
-  and a **Vintage 80s** UK receiver: a backlit tuning dial with a real analogue
-  feel — turn the knob through inter-station static until LTBR·FM locks in —
-  plus twin VU meters and rotary volume. The choice is remembered.
+- **Three faces.** Right-click → **Face** switches between the default rack
+  unit, a **Vintage 80s** UK receiver — a backlit tuning dial with a real
+  analogue feel, turn the knob through inter-station static until LTBR·FM
+  locks in, plus twin VU meters and rotary volume — and **Mini**, a compact
+  strip about a quarter of the footprint that keeps playing while the chrome
+  tucks away. The choice is remembered.
 
 Default stream: `https://stream.ltbr.fm/live` (any Icecast/SHOUTcast MP3 URL
 works — type one in the **Stream** box and press **Tune**).
@@ -46,7 +55,9 @@ Rust engine (background threads)
     ─▶ rubato resample → cpal output       (WASAPI / CoreAudio / ALSA)
        └▶ rustfft ─▶ 20 log bars ─▶ UI event
   state machine: standby │ tuning │ live │ error  ─▶ UI event
-  ICY StreamTitle ─▶ "now playing" ─▶ UI event
+  ICY StreamTitle + StreamUrl ─▶ decode ─▶ held until the audio it
+    describes reaches the speakers ─▶ "nowplaying" / "metadata" UI events
+       └▶ lag vs. the live edge ─▶ trim or resync ─▶ "sync" UI event
 
 Frontend (Tauri webview, vanilla TS)
   Renders the interface + canvases; sends control intents over IPC.
@@ -60,7 +71,9 @@ Source map:
 | Canvas scroller + spectrum | `src/visuals.ts` |
 | EQ / preamp / volume DSP | `src-tauri/src/dsp.rs` |
 | Spectrum FFT | `src-tauri/src/spectrum.rs` |
-| Network + ICY metadata | `src-tauri/src/stream.rs` |
+| Network + ICY demux, byte cursors | `src-tauri/src/stream.rs` |
+| ICY metadata codec (decode) | `src-tauri/src/icy.rs` |
+| Live-edge drift control | `src-tauri/src/sync.rs` |
 | cpal output | `src-tauri/src/output.rs` |
 | Session orchestration | `src-tauri/src/engine.rs` |
 | Tauri commands | `src-tauri/src/lib.rs` |

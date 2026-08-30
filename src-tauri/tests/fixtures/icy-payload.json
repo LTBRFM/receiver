@@ -1,0 +1,271 @@
+{
+  "$comment": "Shared TS/Rust fixtures for the ICY StreamUrl codec (src/lib/stream-metadata/icy-payload.ts is canonical; raas mirrors it). `expected` fields are produced by the TS implementation.",
+  "cases": [
+    {
+      "name": "track with schedule",
+      "input": {
+        "title": "The Tower Block Collective - Concrete Sunrise",
+        "url": {
+          "base": "https://www.ltbr.fm/now",
+          "seq": 412,
+          "playheadMs": 8123456.4,
+          "wallMs": 1756470000123,
+          "kind": "track",
+          "itemId": "0bed7091-1111-4222-8333-444455556666"
+        },
+        "payload": {
+          "v": 1,
+          "s": 412,
+          "p": 8123456.4,
+          "t": 1756470000123,
+          "dp": {
+            "id": "dp-1",
+            "n": "Afternoon Drive",
+            "sh": "The Drive Home",
+            "dj": "Nia"
+          },
+          "now": {
+            "k": "track",
+            "i": "0bed7091-1111-4222-8333-444455556666",
+            "a": "The Tower Block Collective",
+            "ti": "Concrete Sunrise",
+            "st": 8100000,
+            "du": 214000
+          },
+          "q": [
+            {
+              "k": "track",
+              "i": "t2",
+              "a": "Artist Two",
+              "ti": "Second Song",
+              "st": 8314000,
+              "du": 198000
+            },
+            {
+              "k": "track",
+              "i": "t3",
+              "a": "Artist Three",
+              "ti": "Third · Song",
+              "st": 8512000,
+              "du": 201000
+            }
+          ],
+          "tk": [
+            {
+              "i": "line-9",
+              "st": 8314000,
+              "du": 15000,
+              "dj": "Nia",
+              "c": true
+            }
+          ],
+          "j": [
+            {
+              "i": "j-1",
+              "st": 8512000,
+              "du": 9000,
+              "r": "between",
+              "n": "Sweeper 3"
+            }
+          ]
+        },
+        "maxBytes": 3500
+      },
+      "expected": {
+        "title": "The Tower Block Collective - Concrete Sunrise",
+        "url": "https://www.ltbr.fm/now?v=1&s=412&p=8123456&t=1756470000123&k=track&i=0bed7091-1111-4222-8333-444455556666&d=eyJ2IjoxLCJzIjo0MTIsInAiOjgxMjM0NTYsInQiOjE3NTY0NzAwMDAxMjMsImRwIjp7ImlkIjoiZHAtMSIsIm4iOiJBZnRlcm5vb24gRHJpdmUiLCJzaCI6IlRoZSBEcml2ZSBIb21lIiwiZGoiOiJOaWEifSwibm93Ijp7ImsiOiJ0cmFjayIsImkiOiIwYmVkNzA5MS0xMTExLTQyMjItODMzMy00NDQ0NTU1NTY2NjYiLCJhIjoiVGhlIFRvd2VyIEJsb2NrIENvbGxlY3RpdmUiLCJ0aSI6IkNvbmNyZXRlIFN1bnJpc2UiLCJzdCI6ODEwMDAwMCwiZHUiOjIxNDAwMH0sInEiOlt7ImsiOiJ0cmFjayIsImkiOiJ0MiIsImEiOiJBcnRpc3QgVHdvIiwidGkiOiJTZWNvbmQgU29uZyIsInN0Ijo4MzE0MDAwLCJkdSI6MTk4MDAwfSx7ImsiOiJ0cmFjayIsImkiOiJ0MyIsImEiOiJBcnRpc3QgVGhyZWUiLCJ0aSI6IlRoaXJkIMK3IFNvbmciLCJzdCI6ODUxMjAwMCwiZHUiOjIwMTAwMH1dLCJ0ayI6W3siaSI6ImxpbmUtOSIsInN0Ijo4MzE0MDAwLCJkdSI6MTUwMDAsImRqIjoiTmlhIiwiYyI6dHJ1ZX1dLCJqIjpbeyJpIjoiai0xIiwic3QiOjg1MTIwMDAsImR1Ijo5MDAwLCJyIjoiYmV0d2VlbiIsIm4iOiJTd2VlcGVyIDMifV19",
+        "bytes": 954,
+        "dropped": [],
+        "json": "{\"v\":1,\"s\":412,\"p\":8123456,\"t\":1756470000123,\"dp\":{\"id\":\"dp-1\",\"n\":\"Afternoon Drive\",\"sh\":\"The Drive Home\",\"dj\":\"Nia\"},\"now\":{\"k\":\"track\",\"i\":\"0bed7091-1111-4222-8333-444455556666\",\"a\":\"The Tower Block Collective\",\"ti\":\"Concrete Sunrise\",\"st\":8100000,\"du\":214000},\"q\":[{\"k\":\"track\",\"i\":\"t2\",\"a\":\"Artist Two\",\"ti\":\"Second Song\",\"st\":8314000,\"du\":198000},{\"k\":\"track\",\"i\":\"t3\",\"a\":\"Artist Three\",\"ti\":\"Third · Song\",\"st\":8512000,\"du\":201000}],\"tk\":[{\"i\":\"line-9\",\"st\":8314000,\"du\":15000,\"dj\":\"Nia\",\"c\":true}],\"j\":[{\"i\":\"j-1\",\"st\":8512000,\"du\":9000,\"r\":\"between\",\"n\":\"Sweeper 3\"}]}"
+      }
+    },
+    {
+      "name": "no base means no StreamUrl",
+      "input": {
+        "title": "LTBR·FM",
+        "url": {
+          "base": "",
+          "seq": 1,
+          "playheadMs": 0,
+          "wallMs": 0,
+          "kind": "off",
+          "itemId": ""
+        },
+        "payload": null,
+        "maxBytes": 3500
+      },
+      "expected": {
+        "title": "LTBR·FM",
+        "url": "",
+        "bytes": 23,
+        "dropped": [],
+        "json": null
+      }
+    },
+    {
+      "name": "truncates q then j then tk then drops d",
+      "input": {
+        "title": "A - B",
+        "url": {
+          "base": "https://x.test/now",
+          "seq": 7,
+          "playheadMs": 1000,
+          "wallMs": 2000,
+          "kind": "track",
+          "itemId": "t1"
+        },
+        "payload": {
+          "v": 1,
+          "s": 7,
+          "p": 1000,
+          "t": 2000,
+          "now": {
+            "k": "track",
+            "i": "t1",
+            "a": "A",
+            "ti": "B",
+            "st": 0,
+            "du": 10
+          },
+          "q": [
+            {
+              "k": "track",
+              "i": "t2",
+              "a": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+              "ti": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+              "st": 10,
+              "du": 10
+            }
+          ],
+          "tk": [
+            {
+              "i": "l1",
+              "st": 5,
+              "du": 5,
+              "dj": "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"
+            }
+          ],
+          "j": [
+            {
+              "i": "j1",
+              "st": 8,
+              "du": 2,
+              "r": "hour",
+              "n": "JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ"
+            }
+          ]
+        },
+        "maxBytes": 150
+      },
+      "expected": {
+        "title": "A - B",
+        "url": "https://x.test/now?v=1&s=7&p=1000&t=2000&k=track&i=t1",
+        "bytes": 86,
+        "dropped": [
+          "q",
+          "j",
+          "tk",
+          "d"
+        ],
+        "json": "{\"v\":1,\"s\":7,\"p\":1000,\"t\":2000,\"now\":{\"k\":\"track\",\"i\":\"t1\",\"a\":\"A\",\"ti\":\"B\",\"st\":0,\"du\":10},\"q\":[{\"k\":\"track\",\"i\":\"t2\",\"a\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"ti\":\"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\",\"st\":10,\"du\":10}],\"tk\":[{\"i\":\"l1\",\"st\":5,\"du\":5,\"dj\":\"NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN\"}],\"j\":[{\"i\":\"j1\",\"st\":8,\"du\":2,\"r\":\"hour\",\"n\":\"JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ\"}]}"
+      }
+    },
+    {
+      "name": "drops only the upcoming-track tail",
+      "input": {
+        "title": "A - B",
+        "url": {
+          "base": "https://x.test/now",
+          "seq": 8,
+          "playheadMs": 1000,
+          "wallMs": 2000,
+          "kind": "track",
+          "itemId": "t1"
+        },
+        "payload": {
+          "v": 1,
+          "s": 8,
+          "p": 1000,
+          "t": 2000,
+          "now": {
+            "k": "track",
+            "i": "t1",
+            "a": "A",
+            "ti": "B",
+            "st": 0,
+            "du": 10
+          },
+          "q": [
+            {
+              "k": "track",
+              "i": "t2",
+              "a": "Artist Two",
+              "ti": "Second Song",
+              "st": 10,
+              "du": 10
+            },
+            {
+              "k": "track",
+              "i": "t3",
+              "a": "Artist Three",
+              "ti": "Third Song",
+              "st": 20,
+              "du": 10
+            },
+            {
+              "k": "track",
+              "i": "t4",
+              "a": "Artist Four",
+              "ti": "Fourth Song",
+              "st": 30,
+              "du": 10
+            }
+          ],
+          "tk": [],
+          "j": []
+        },
+        "maxBytes": 330
+      },
+      "expected": {
+        "title": "A - B",
+        "url": "https://x.test/now?v=1&s=8&p=1000&t=2000&k=track&i=t1&d=eyJ2IjoxLCJzIjo4LCJwIjoxMDAwLCJ0IjoyMDAwLCJub3ciOnsiayI6InRyYWNrIiwiaSI6InQxIiwiYSI6IkEiLCJ0aSI6IkIiLCJzdCI6MCwiZHUiOjEwfSwicSI6W10sInRrIjpbXSwiaiI6W119",
+        "bytes": 241,
+        "dropped": [
+          "q"
+        ],
+        "json": "{\"v\":1,\"s\":8,\"p\":1000,\"t\":2000,\"now\":{\"k\":\"track\",\"i\":\"t1\",\"a\":\"A\",\"ti\":\"B\",\"st\":0,\"du\":10},\"q\":[{\"k\":\"track\",\"i\":\"t2\",\"a\":\"Artist Two\",\"ti\":\"Second Song\",\"st\":10,\"du\":10},{\"k\":\"track\",\"i\":\"t3\",\"a\":\"Artist Three\",\"ti\":\"Third Song\",\"st\":20,\"du\":10},{\"k\":\"track\",\"i\":\"t4\",\"a\":\"Artist Four\",\"ti\":\"Fourth Song\",\"st\":30,\"du\":10}],\"tk\":[],\"j\":[]}"
+      }
+    },
+    {
+      "name": "id needing percent-encoding and base with existing query",
+      "input": {
+        "title": "Café - Naïve",
+        "url": {
+          "base": "https://x.test/now?src=icy",
+          "seq": 3,
+          "playheadMs": 50,
+          "wallMs": 60,
+          "kind": "jingle",
+          "itemId": "a b&c"
+        },
+        "payload": {
+          "v": 1,
+          "s": 3,
+          "p": 50,
+          "t": 60,
+          "q": [],
+          "tk": [],
+          "j": []
+        },
+        "maxBytes": 3500
+      },
+      "expected": {
+        "title": "Café - Naïve",
+        "url": "https://x.test/now?src=icy&v=1&s=3&p=50&t=60&k=jingle&i=a%20b%26c&d=eyJ2IjoxLCJzIjozLCJwIjo1MCwidCI6NjAsInEiOltdLCJ0ayI6W10sImoiOltdfQ",
+        "bytes": 176,
+        "dropped": [],
+        "json": "{\"v\":1,\"s\":3,\"p\":50,\"t\":60,\"q\":[],\"tk\":[],\"j\":[]}"
+      }
+    }
+  ]
+}

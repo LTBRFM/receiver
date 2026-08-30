@@ -15,6 +15,71 @@ import { listen } from "@tauri-apps/api/event";
 
 export type EngineState = "standby" | "tuning" | "live" | "error";
 
+// ---- metadata ---------------------------------------------------------------
+//
+// Mirrors the payloads the Rust engine emits, which in turn mirror the
+// station's in-band ICY contract (music-db docs/player-stream-metadata-api.md).
+// The engine releases these in step with the audio, so `playheadMs` is the
+// station timeline position of what is being heard *right now* — anchor on it
+// and interpolate to run a countdown without any clock sync.
+
+export interface Segment {
+  kind: string;
+  id: string;
+  artist?: string;
+  title?: string;
+  startMs: number;
+  durationMs: number;
+}
+
+export interface Programme {
+  id: string;
+  name: string;
+  showTitle?: string;
+  dj?: string;
+}
+
+export interface Station {
+  name: string;
+  description: string;
+  genre: string;
+  url: string;
+  bitrateKbps: number;
+}
+
+export interface Metadata {
+  title: string;
+  /** track | jingle | talk | off | hb */
+  kind: string;
+  seq: number;
+  playheadMs: number;
+  itemId: string;
+  station?: Station;
+  programme?: Programme;
+  now?: Segment;
+  next: Segment[];
+  talk: { id: string; startMs: number; durationMs: number; dj?: string; fromChat?: boolean }[];
+  jingles: { id: string; startMs: number; durationMs: number; role: string; name?: string }[];
+  /** The schedule was dropped to fit the block's byte cap — the lists are empty
+   *  because we were not told, not because nothing is coming up. */
+  scheduleTruncated: boolean;
+}
+
+export interface SyncInfo {
+  lagMs: number | null;
+  excessMs: number | null;
+  bufferMs: number;
+  bufferBytes: number;
+  bitrateKbps: number;
+  targetMs: number;
+  ceilingMs: number;
+  state: string;
+  action: string;
+  droppedMs: number;
+  catchups: number;
+  reconnects: number;
+}
+
 export const DEFAULT_URL = "https://stream.ltbr.fm/live";
 
 // Fire-and-forget command helper — the engine is authoritative, so a failed
@@ -30,15 +95,23 @@ type TitleCb = (title: string) => void;
 type SpectrumCb = (bars: number[]) => void;
 type FaultCb = (message: string) => void;
 type MuteCb = (muted: boolean) => void;
+type MetaCb = (m: Metadata) => void;
+type SyncCb = (s: SyncInfo) => void;
 
 const stateCbs: StateCb[] = [];
 const titleCbs: TitleCb[] = [];
 const spectrumCbs: SpectrumCb[] = [];
 const faultCbs: FaultCb[] = [];
 const muteCbs: MuteCb[] = [];
+const metaCbs: MetaCb[] = [];
+const syncCbs: SyncCb[] = [];
 
 let engineState: EngineState = "standby";
 let nowPlaying = "";
+let metadata: Metadata | null = null;
+let station: Station | null = null;
+/** Anchor for interpolating the station timeline between blocks. */
+let anchor: { playheadMs: number; at: number } | null = null;
 let userVolume = 0.8;
 let signalFactor = 1;
 let muted = false;
@@ -48,11 +121,22 @@ export function onNowPlaying(cb: TitleCb) { titleCbs.push(cb); }
 export function onSpectrum(cb: SpectrumCb) { spectrumCbs.push(cb); }
 export function onFault(cb: FaultCb) { faultCbs.push(cb); }
 export function onMuteChange(cb: MuteCb) { muteCbs.push(cb); }
+export function onMetadata(cb: MetaCb) { metaCbs.push(cb); }
+export function onSync(cb: SyncCb) { syncCbs.push(cb); }
 
 export function getState(): EngineState { return engineState; }
 export function getNowPlaying(): string { return nowPlaying; }
 export function getUserVolume(): number { return userVolume; }
 export function getMuted(): boolean { return muted; }
+export function getMetadata(): Metadata | null { return metadata; }
+export function getStation(): Station | null { return station; }
+
+/** Where the listener is on the station's timeline, interpolated forward from
+ *  the last block. Null until one has arrived. */
+export function timelineMs(): number | null {
+  if (!anchor) return null;
+  return anchor.playheadMs + (Date.now() - anchor.at);
+}
 
 function emitState(s: EngineState, message?: string) {
   engineState = s;
@@ -74,6 +158,8 @@ export function pause() {
 export function stop() {
   cmd("stop");
   nowPlaying = "";
+  metadata = null;
+  anchor = null;
   emitState("standby");
 }
 
@@ -126,6 +212,18 @@ export function initPlayer() {
   listen<{ title: string }>("nowplaying", (e) => {
     nowPlaying = e.payload.title || "";
     for (const cb of titleCbs) cb(nowPlaying);
+  });
+
+  listen<Metadata>("metadata", (e) => {
+    metadata = e.payload;
+    if (e.payload.station) station = e.payload.station;
+    // Released in step with the audio, so "now" really is now.
+    anchor = { playheadMs: e.payload.playheadMs, at: Date.now() };
+    for (const cb of metaCbs) cb(metadata);
+  });
+
+  listen<SyncInfo>("sync", (e) => {
+    for (const cb of syncCbs) cb(e.payload);
   });
 
   listen<{ message: string }>("fault", (e) => {

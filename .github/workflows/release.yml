@@ -109,9 +109,23 @@ jobs:
           releaseBody: |
             ### What's new
 
-            - **Vintage 80s is now the default face.** New installs open on
-              the backlit tuning-dial receiver instead of the rack unit;
-              existing users' saved face choice is unaffected.
+            - **Two-line dot-matrix display.** The top line carries the station
+              and the track you are hearing; the bottom line cycles through the
+              next track with a live countdown, the programme and the DJ on
+              air. It fits the panel that was already there — no window grew.
+            - **The full metadata set.** The receiver now decodes the station's
+              complete in-band ICY payload (current and upcoming tracks,
+              programme, DJ, talk and ident markers) instead of just the track
+              title.
+            - **The display no longer runs ahead of the audio.** Metadata is
+              held until the audio it describes actually reaches your speakers,
+              so the track name changes exactly when the track does.
+            - **Stays on the live edge.** The same timing anchor measures how
+              far behind the broadcast you are. Drift past 15s is trimmed back
+              to the ~8s target, falling back to a silent reconnect if trimming
+              will not hold — no more slowly sliding minutes behind the station.
+            - **Mini is now a face.** The minimise key has left both fascias;
+              pick **Face → Mini** from the right-click menu instead.
 
             ### Downloads
 

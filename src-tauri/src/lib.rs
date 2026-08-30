@@ -4,9 +4,11 @@
 
 pub mod dsp;
 pub mod engine;
+pub mod icy;
 pub mod output;
 pub mod spectrum;
 pub mod stream;
+pub mod sync;
 pub mod update;
 pub mod window_menu;
 
