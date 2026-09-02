@@ -212,7 +212,6 @@ for (const sel of [".brand", ".vbrand .vname"]) {
 
 const txState = document.getElementById("txState")!;
 const txLabel = document.getElementById("txLabel")!;
-const metaVal = document.getElementById("metaVal")!;
 const faultEl = document.getElementById("fault")!;
 const btnPlay = document.getElementById("btnPlay")!;
 const icoPlay = document.getElementById("icoPlay")!;
@@ -321,26 +320,24 @@ function hostOf(u: string): string {
 
 // ---- dot-matrix display -----------------------------------------------------
 //
-// Two bands. The top one is always what you are hearing — station, state and
-// the current track — and is never used for anything else. The bottom one is a
-// context belt: it cycles through whichever of the next track, the programme
-// and the DJ the station has actually told us about, and yields to transient
-// notices (DJ on air, a station ident, an EQ change, a resync).
+// Three bands. The top one is the station and its state (on air / tuning /
+// no carrier) and is never used for anything else. The middle one is always
+// what you are hearing right now — the current track, or a transient notice
+// (DJ on air, a station ident, an EQ change, a resync) taking over for a few
+// seconds. The bottom one is a plain "NEXT: artist - track" readout — no
+// countdown, so its text (and therefore its scroll position) only changes
+// when the actual next-up track changes, not once a second.
 //
 // Everything below reads from the decoded ICY payload, which the engine
-// releases in step with the audio, so the countdown to the next track is
-// honest rather than an estimate.
+// releases in step with the audio.
 
-const STATION_FALLBACK = "LTBR·FM";
-const ROTATE_MS = 8000;
+const STATION_FALLBACK = "LONDON TOWER BLOCK RADIO";
 const FLASH_MS = 3000;
 
-let rotation = 0;
-let rotateAt = 0;
 let flashText = "";
 let flashUntil = 0;
 
-/** Take the secondary line for a few seconds, then let it resume rotating. */
+/** Take the current-track line for a few seconds, then let it resume. */
 function flashLine2(text: string) {
   flashText = text;
   flashUntil = Date.now() + FLASH_MS;
@@ -359,15 +356,6 @@ function segmentLabel(seg: player.Segment): string {
   return title || artist || "";
 }
 
-/** m:ss, or "<1:00" style seconds for very short gaps. Track durations vary
- *  wildly — the station schedules idents only a few seconds long. */
-function countdown(ms: number): string {
-  const total = Math.max(0, Math.round(ms / 1000));
-  const m = Math.floor(total / 60);
-  const sec = total % 60;
-  return m > 0 ? `${m}:${String(sec).padStart(2, "0")}` : `${sec}S`;
-}
-
 /** Markers are on the station timeline, so "live" means the interpolated
  *  listener position falls inside them. */
 function activeMarker<T extends { startMs: number; durationMs: number }>(
@@ -378,61 +366,46 @@ function activeMarker<T extends { startMs: number; durationMs: number }>(
   return markers.find((m) => now >= m.startMs && now < m.startMs + m.durationMs);
 }
 
-/** The rotating context belt. Returns the candidates that actually have data,
- *  so a station that sends no schedule simply shows fewer things rather than
- *  blank slots. */
-function line2Candidates(): string[] {
+/** What you are hearing right now: a transient notice if one applies, else
+ *  the current track, else whatever fallback title we last saw. */
+function currentLine(): string {
+  if (Date.now() < flashUntil) return flashText;
+
   const meta = player.getMetadata();
-  if (!meta) return [];
-  const out: string[] = [];
-  const now = player.timelineMs();
+  if (meta) {
+    const now = player.timelineMs();
+    const talk = activeMarker(meta.talk, now);
+    if (talk || meta.kind === "talk") {
+      const dj = talk?.dj || meta.programme?.dj;
+      return dj ? `DJ ON AIR · ${dj}` : "DJ ON AIR";
+    }
+    // Jingle names are raw asset slugs (LTBR_FM_All_Day_..._01), so they are
+    // never shown verbatim.
+    if (activeMarker(meta.jingles, now) || meta.kind === "jingle") {
+      return "STATION IDENT";
+    }
+    const label = meta.now ? segmentLabel(meta.now) : "";
+    if (label) return label;
+  }
+  return nowPlaying || hostOf(streamUrl.value);
+}
+
+/** "NEXT: artist - track", or a placeholder when told nothing, or empty when
+ *  the station simply has no schedule data. No countdown here on purpose —
+ *  a timer changes every second, which would keep resetting the scroll. */
+function nextLine(): string {
+  const meta = player.getMetadata();
+  if (!meta) return "";
 
   const next = meta.next[0];
   if (next) {
     const label = segmentLabel(next);
-    if (label) {
-      const eta = now !== null ? next.startMs - now : null;
-      out.push(
-        eta !== null && eta > 0
-          ? `NEXT · ${label} · IN ${countdown(eta)}`
-          : `NEXT · ${label}`,
-      );
-    }
+    if (label) return `NEXT: ${label}`;
   } else if (meta.scheduleTruncated) {
     // Told nothing, rather than told there is nothing.
-    out.push("NEXT · —");
+    return "NEXT: —";
   }
-
-  const prog = meta.programme;
-  if (prog) {
-    const show = prog.showTitle?.trim() || prog.name?.trim();
-    const dj = prog.dj?.trim();
-    if (show && dj) out.push(`${show} · WITH ${dj}`);
-    else if (show) out.push(show);
-    else if (dj) out.push(`WITH ${dj}`);
-  }
-  return out;
-}
-
-/** Transient states that take the line immediately, ahead of the rotation. */
-function line2Override(): string | null {
-  if (Date.now() < flashUntil) return flashText;
-
-  const meta = player.getMetadata();
-  if (!meta) return null;
-  const now = player.timelineMs();
-
-  const talk = activeMarker(meta.talk, now);
-  if (talk || meta.kind === "talk") {
-    const dj = talk?.dj || meta.programme?.dj;
-    return dj ? `DJ ON AIR · ${dj}` : "DJ ON AIR";
-  }
-  // Jingle names are raw asset slugs (LTBR_FM_All_Day_..._01), so they are
-  // never shown verbatim.
-  if (activeMarker(meta.jingles, now) || meta.kind === "jingle") {
-    return "STATION IDENT";
-  }
-  return null;
+  return "";
 }
 
 function renderDisplay() {
@@ -443,53 +416,40 @@ function renderDisplay() {
     if (meta?.kind === "off") {
       setLine(0, `${station} · OFF AIR ·`);
       setLine(1, "");
+      setLine(2, "");
       return;
     }
 
-    const label = meta?.now ? segmentLabel(meta.now) : "";
-    const heading = label || nowPlaying || hostOf(streamUrl.value);
-    setLine(0, `${station} · ON AIR · ${heading.toUpperCase()} ·`);
-
-    const override = line2Override();
-    if (override) {
-      setLine(1, override.toUpperCase() + " ·");
-      return;
-    }
-
-    const belt = line2Candidates();
-    if (belt.length === 0) {
-      setLine(1, "");
-      return;
-    }
-    const now = Date.now();
-    if (now >= rotateAt) {
-      rotateAt = now + ROTATE_MS;
-      rotation++;
-    }
-    setLine(1, belt[rotation % belt.length].toUpperCase() + " ·");
+    setLine(0, `${station} · ON AIR ·`);
+    setLine(1, currentLine().toUpperCase() + " ·");
+    const next = nextLine();
+    setLine(2, next ? next.toUpperCase() + " ·" : "");
     return;
   }
 
   if (engineState === "tuning") {
     setLine(0, `${stationName().toUpperCase()} · TUNING ·`);
     setLine(1, "STAND BY ·");
+    setLine(2, "");
   } else if (engineState === "error") {
     setLine(0, `${stationName().toUpperCase()} · NO CARRIER ·`);
     setLine(1, "RETRYING ·");
+    setLine(2, "");
   } else {
-    setScroll("LTBR FM · LONDON TOWER BLOCK RADIO · PRESS PLAY ·");
+    setScroll(`${STATION_FALLBACK} · PRESS PLAY ·`);
     setLine(1, "");
+    setLine(2, "");
   }
 }
 
-// The countdown and the rotation both move on their own, so the display is
-// refreshed on a slow timer rather than only on engine events. One second is
-// as fine-grained as a m:ss readout can show.
+// A flashed notice (EQ change, resync) expires on its own timer, so the
+// display is refreshed on a slow tick rather than only on engine events —
+// otherwise it would stay stuck until the next unrelated event.
 setInterval(() => {
   if (engineState === "live") renderDisplay();
 }, 1000);
 
-function applyState(s: typeof engineState, message?: string) {
+function applyState(s: typeof engineState) {
   engineState = s;
   const playing = s === "live" || s === "tuning";
   setPlaying(s === "live");
@@ -506,14 +466,7 @@ function applyState(s: typeof engineState, message?: string) {
   icoPlay.querySelector("path")!.setAttribute("d", playing ? PAUSE_PATH : PLAY_PATH);
   btnPlay.setAttribute("aria-label", playing ? "Pause" : "Play");
 
-  if (s === "live") {
-    metaVal.textContent = nowPlaying || hostOf(streamUrl.value);
-  } else if (s === "tuning") {
-    metaVal.textContent = message || "acquiring…";
-  } else if (s === "error") {
-    metaVal.textContent = "— no carrier —";
-  } else {
-    metaVal.textContent = message || "— no carrier —";
+  if (s !== "live" && s !== "tuning" && s !== "error") {
     clearSpectrum();
   }
   renderDisplay();
@@ -600,12 +553,8 @@ btnEq.addEventListener("click", () => setEqVisible(!eqVisible));
 // single global preference rather than per-face state: picking Receiver or
 // Vintage from the same menu expands straight back to that face.
 let minimized = false;
-// The width to restore when expanding again — captured the moment we shrink,
-// since the window is otherwise always the width the current face settled on.
-let normalWidth: number | null = null;
 
 const MINI_KEY = "ltbrfm.mini";
-const MINI_WIDTH = 320;
 
 function savedMinimized(f: FaceId): boolean {
   try {
@@ -620,7 +569,6 @@ function savedMinimized(f: FaceId): boolean {
 }
 
 function setMinimized(v: boolean) {
-  if (v && !minimized) normalWidth = window.innerWidth;
   minimized = v;
   document.body.classList.toggle("mini", v);
   refreshFaceChecks(currentFace());
@@ -685,7 +633,7 @@ document.getElementById("btnPower")!.addEventListener("click", () => {
 const DRAG_REGIONS = [
   ".unit", ".face", ".brand-row", ".brand", ".strap",
   ".windows", ".window", "canvas",
-  ".transport", ".keys", ".meta", ".meta .lbl", ".meta .val", ".vol", ".vol .lbl",
+  ".transport", ".keys", ".vol", ".vol .lbl",
   ".eq", ".eq-head", ".eq-head .title", ".presets", ".bands", ".band",
   ".band .hz", ".band .db", ".rule",
   ".source", ".source label", ".fault", ".tx", ".screw",
@@ -805,9 +753,9 @@ onFaceChange((f) => {
 
 // ---- engine events ---------------------------------------------------------
 
-player.onState((s, message) => {
+player.onState((s) => {
   nowPlaying = player.getNowPlaying();
-  applyState(s, message);
+  applyState(s);
 });
 
 player.onNowPlaying((title) => {
@@ -832,57 +780,23 @@ player.onSpectrum((bars) => setSpectrum(bars));
 
 // ---- boot ------------------------------------------------------------------
 
-// Fit the window to the faceplate's natural height. Font metrics differ per
-// platform (WebKitGTK renders text more compactly than macOS/Windows), so a
-// hard-coded height leaves a bottom margin on some systems and clips on
-// others. Measure the real content and size the window to it exactly.
-//
-// Measuring is only trustworthy once the bundled fonts are loaded AND the
-// webview viewport has caught up with the *target* width — at boot (notably
-// macOS/WKWebView) the first frames render before either is true, and a
-// measurement taken then sees a wrapped layout and locks in a squeezed
-// window. The same trap bites when toggling the mini bar: reading content
-// height right after changing width class(es) still reflects the OLD
-// viewport width (the native window hasn't resized yet), so it sees a
-// wrapped/inflated layout unless we wait for the viewport to actually
-// reach the target width first.
-async function fitWindow(attempt = 0) {
-  const face = document.querySelector(".face") as HTMLElement;
-  if (!face) return;
+// Fit the window to the active face. Every face (and its mini variant)
+// declares an intrinsic, fixed size in CSS, so the face lays out identically
+// regardless of the current viewport — we just measure its box and size the
+// native window to match. Font metrics differ per platform (WebKitGTK
+// renders text more compactly than macOS/Windows), so heights are always
+// measured rather than hard-coded; the only precondition is that the
+// bundled fonts have finished loading.
+async function fitWindow() {
   await document.fonts.ready;
-  const win = getCurrentWindow();
-
-  // The width we're aiming for: a fixed compact bar while minimised, the
-  // previously-captured full width when restoring it, or (first boot, never
-  // having been minimised) whatever the OS already gave the window.
-  const desiredWidth = minimized
-    ? MINI_WIDTH
-    : normalWidth ?? (await win.innerSize()).toLogical(await win.scaleFactor()).width;
-
-  if (Math.abs(window.innerWidth - desiredWidth) > 1) {
-    if (attempt === 0) {
-      // Command the width now; height is corrected in a follow-up pass
-      // once the viewport has actually caught up — measuring at the old
-      // width would see a wrapped, artificially tall layout.
-      await win.setSize(new LogicalSize(desiredWidth, window.innerHeight));
-    }
-    // Viewport not settled yet — retry for up to ~1s, else leave the
-    // configured size alone rather than resize from a bad measurement.
-    if (attempt < 60) {
-      requestAnimationFrame(() => {
-        fitWindow(attempt + 1).catch((e) => console.error("fitWindow failed:", e));
-      });
-    }
-    return;
-  }
-
-  // Measure whichever face is active: the default fascia plus the unit
-  // border, or the vintage receiver's full case.
-  const target = currentFace() === "vintage"
-    ? Math.ceil(document.getElementById("faceVintage")!.offsetHeight)
-    : Math.ceil(face.offsetHeight) + 2; // + unit border
-  if (Math.abs(window.innerHeight - target) > 1) {
-    await win.setSize(new LogicalSize(desiredWidth, target));
+  const root = currentFace() === "vintage"
+    ? document.getElementById("faceVintage")!
+    : document.getElementById("faceDefault")!;
+  const w = Math.ceil(root.offsetWidth);
+  const h = Math.ceil(root.offsetHeight);
+  if (!w || !h) return; // hidden or not laid out yet — nothing to trust
+  if (Math.abs(window.innerWidth - w) > 1 || Math.abs(window.innerHeight - h) > 1) {
+    await getCurrentWindow().setSize(new LogicalSize(w, h));
   }
 }
 
@@ -895,3 +809,15 @@ applyState("standby");
 requestAnimationFrame(() => {
   fitWindow().catch((e) => console.error("fitWindow failed:", e));
 });
+
+// The native window is sized to the fascia, so whenever the fascia's own
+// footprint changes for any reason not already covered above (style
+// hot-reload in dev, font swap-in, future layout tweaks), re-fit rather
+// than leaving a stale window that clips content or shows bare backdrop.
+const refit = new ResizeObserver(() => {
+  requestAnimationFrame(() => {
+    fitWindow().catch((e) => console.error("fitWindow failed:", e));
+  });
+});
+refit.observe(document.querySelector(".face")!);
+refit.observe(document.getElementById("faceVintage")!);

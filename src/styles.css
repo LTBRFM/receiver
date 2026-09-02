@@ -52,9 +52,13 @@ body{
 
 /* ---------- The unit ---------- */
 
+/* Each face declares its own intrinsic size here in CSS — the native window
+   is always fitted to the active face's measured box (fitWindow in main.ts),
+   never the other way round. Fluid (100%-wide) faces once inherited whatever
+   width the window happened to have, which let a mini-width snapshot leak
+   into the full faces; fixed design widths make every face independent. */
 .unit{
-  width:100%;
-  height:100%;
+  width:720px;
   background:
     linear-gradient(180deg, var(--face-hi) 0%, var(--face) 8%, var(--face) 92%, var(--face-lo) 100%);
   border:1px solid #0a0908;
@@ -262,14 +266,6 @@ button.key[aria-pressed="true"]{
 button.key:focus-visible{ outline:2px solid var(--focus); outline-offset:2px }
 button.key svg{ width:15px;height:15px; fill:currentColor }
 
-.meta{ display:flex; flex-direction:column; gap:3px; min-width:0 }
-.meta .lbl{ font-size:8px; letter-spacing:.3em; text-transform:uppercase; color:var(--concrete-dim) }
-.meta .val{
-  font-family:"LTBR Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
-  font-size:12px; color:#cfc5b6; letter-spacing:.05em;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
-
 .vol{ margin-left:auto; display:flex; align-items:center; gap:11px }
 .vol .lbl{ font-size:8px; letter-spacing:.3em; text-transform:uppercase; color:var(--concrete-dim) }
 
@@ -443,32 +439,32 @@ button.ctx-item[aria-checked="true"] .ctx-led{
    leaves just the brand strip and a slim transport bar — about a quarter
    of the full faceplate's footprint. The engine and any EQ settings are
    untouched; the panels are only detached from view. */
-body.mini:not(.face-vintage) .unit{ width:320px }
-body.mini:not(.face-vintage) .face{ padding:16px 20px 18px }
+body.mini:not(.face-vintage) .unit{ width:360px }
 body.mini:not(.face-vintage) .strap,
-body.mini:not(.face-vintage) .windows,
+body.mini:not(.face-vintage) .w-scroll,
 body.mini:not(.face-vintage) .eq,
 body.mini:not(.face-vintage) .source,
 body.mini:not(.face-vintage) .fault,
 body.mini:not(.face-vintage) #btnStop,
 body.mini:not(.face-vintage) #btnEq,
-body.mini:not(.face-vintage) .meta .lbl,
 body.mini:not(.face-vintage) .vol .lbl{ display:none }
-body.mini:not(.face-vintage) .brand-row{ padding-bottom:10px }
-body.mini:not(.face-vintage) .transport{ margin-top:12px; gap:12px; flex-wrap:nowrap }
-body.mini:not(.face-vintage) .meta{ flex:1 1 auto; min-width:0 }
-body.mini:not(.face-vintage) .vol{ margin-left:0 }
-body.mini:not(.face-vintage) .fader-h{ width:82px }
+/* Face padding, brand-row spacing and the screws themselves are untouched —
+   they keep the exact proportions of the full faceplate. Only #btnPower
+   needs help: it relied on .strap's flex:1 to push it flush against the
+   right screw, and .strap is gone in mini, so it gets its own auto margin. */
+/* In the full face .strap's flex:1 sits between the brand and the tx/power
+   pair, keeping them glued together on the right. .strap is hidden in mini,
+   so give that job to .tx directly — it pulls itself (and power right
+   after it) flush to the right screw, instead of floating mid-row. */
+body.mini:not(.face-vintage) .tx{ margin-left:auto }
+body.mini:not(.face-vintage) .windows{ margin:0 0 16px }
+body.mini:not(.face-vintage) .w-spec{ flex:1 1 auto; display:flex; justify-content:center }
+body.mini:not(.face-vintage) .transport{ margin-top:0; gap:16px; flex-wrap:nowrap }
+body.mini:not(.face-vintage) .vol{ margin-left:0; flex:1 1 auto }
+body.mini:not(.face-vintage) .fader-h{ width:100%; min-width:60px }
 
 @media (prefers-reduced-motion: reduce){
   *{ animation:none !important; transition:none !important }
-}
-@media (max-width:620px){
-  .face{ padding:20px 20px 22px }
-  #spectrum{ width:100%; }
-  .w-spec{ flex:1 1 100% }
-  .vol{ margin-left:0; width:100% }
-  .fader-v{ height:74px }
 }
 
 /* ---------- Auto-update overlay ---------- */

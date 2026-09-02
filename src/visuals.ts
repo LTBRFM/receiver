@@ -46,13 +46,20 @@ function fitCanvas(cv: HTMLCanvasElement, cssW: number) {
 
 export function resize() {
   // A hidden face reports zero/negative widths — sizing canvases from those
-  // would allocate absurd backing stores. Skip; we re-run on face switch.
-  if (spec.offsetParent === null) return;
-  const specParentW = spec.parentElement!.clientWidth - 22;
-  if (specParentW <= 0) return;
-  specDims = fitCanvas(spec, specParentW > 400 ? 196 : Math.min(196, specParentW));
-  spec.style.width = specDims.w + "px";
-  scrDims = fitCanvas(scr, scr.parentElement!.clientWidth - 22);
+  // would allocate absurd backing stores (or, worse, wrap a negative width
+  // into a huge unsigned one). Skip each canvas independently since the mini
+  // bar shows the spectrum but hides the scroller.
+  if (spec.offsetParent !== null) {
+    const specParentW = spec.parentElement!.clientWidth - 22;
+    if (specParentW > 0) {
+      specDims = fitCanvas(spec, specParentW > 400 ? 196 : Math.min(196, specParentW));
+      spec.style.width = specDims.w + "px";
+    }
+  }
+  if (scr.offsetParent !== null) {
+    const scrParentW = scr.parentElement!.clientWidth - 22;
+    if (scrParentW > 0) scrDims = fitCanvas(scr, scrParentW);
+  }
   buildGrid();
 }
 
@@ -223,21 +230,31 @@ function rasterise(text: string): { bits: Uint8Array; w: number } {
   return { bits, w };
 }
 
-// The panel is two independent 7-row bands. Each keeps its own bitmap and its
-// own scroll offset, but both advance at the same rate — differing speeds make
-// the two lines visibly beat against one another instead of reading as one
-// display.
+// The panel is three independent 7-row bands, each with its own bitmap and
+// scroll offset. Band 0 (station/state) never carries new information mid
+// scroll, so it runs faster and never pauses. Bands 1-2 (current/next track)
+// restart from the left and hold still for a beat whenever their text
+// changes, so a fresh headline is never caught mid-scroll — then resume at
+// the normal rate.
 interface Line {
   bits: Uint8Array | null;
   w: number;
   x: number;
   text: string;
+  pause: number; // ms left to hold at x=0 after a text change (bands 1-2 only)
 }
 
-const LINES = 2;
-const LINE_GAP = 6; // unlit rows between the two bands
-const DOT = 3, DOT_GAP = 1, PITCH = DOT + DOT_GAP;
+const LINES = 3;
+const LINE_GAP = 4; // unlit rows between bands
+// Three bands now share the same window height that used to hold two, so the
+// dot pitch shrinks accordingly. Because the grid is square, a smaller pitch
+// also packs more columns into the same width — the shorter dots buy back
+// the horizontal room the third band costs vertically.
+const DOT = 2, DOT_GAP = 1, PITCH = DOT + DOT_GAP;
 const BAND_H = ROWS * PITCH - DOT_GAP;
+const SCROLL_SPEED = 0.022;
+const HEADLINE_SPEED = SCROLL_SPEED * 1.25; // band 0: same content throughout, so it can move faster
+const CHANGE_PAUSE_MS = 3000; // let the reader catch a fresh headline before it scrolls
 const LIT = "#ff9b21";
 const UNLIT = "#241705";
 
@@ -246,9 +263,10 @@ const lines: Line[] = Array.from({ length: LINES }, () => ({
   w: 0,
   x: 0,
   text: "",
+  pause: 0,
 }));
 
-/** Vertical origin of band `i`, both bands centred as a group. */
+/** Vertical origin of band `i`, all bands centred as a group. */
 function bandTop(i: number, h: number): number {
   const total = BAND_H * LINES + LINE_GAP * (LINES - 1);
   return Math.round((h - total) / 2) + i * (BAND_H + LINE_GAP);
@@ -262,6 +280,9 @@ export function setLine(i: number, text: string) {
   line.bits = bits;
   line.w = w;
   line.x = 0;
+  // Band 0 always scrolls; bands 1-2 hold the fresh headline still for a
+  // beat so it isn't caught mid-scroll the instant the track changes.
+  line.pause = i === 0 ? 0 : CHANGE_PAUSE_MS;
 }
 
 /** Back-compat alias: the top line is the primary one. */
@@ -318,7 +339,13 @@ function drawScroller(dt: number) {
         }
       }
     }
-    if (playing || tuning) line.x += dt * 0.022;
+    if (playing || tuning) {
+      if (line.pause > 0) {
+        line.pause -= dt;
+      } else {
+        line.x += dt * (i === 0 ? HEADLINE_SPEED : SCROLL_SPEED);
+      }
+    }
   }
 }
 

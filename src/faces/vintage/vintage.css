@@ -9,6 +9,8 @@
 --------------------------------------------------------------------------- */
 
 .vunit{
+  /* Intrinsic design width — the window is fitted to this, see fitWindow. */
+  width:720px;
   /* walnut sleeve around the fascia */
   padding:12px 14px;
   background:
@@ -256,20 +258,24 @@ body.face-vintage .eq.hidden{ display:none }
    (shrunk) and the volume knob (shrunk), still about a quarter of the
    receiver's normal footprint. Powering, muting and any held tuning all
    keep running exactly as before; only the chrome is tucked away. */
-body.mini.face-vintage .vunit{ width:320px; padding:10px 12px }
-body.mini.face-vintage .vface{ padding:14px 18px 16px }
+/* Width matches the default face's mini bar (MINI_WIDTH in main.ts) so the
+   window never shows bare background past the unit's right edge, and the
+   whole thing is a touch taller so the right-click context menu (~160px
+   tall) actually fits inside the native window instead of being clipped. */
+body.mini.face-vintage .vunit{ width:360px; padding:14px 16px }
+body.mini.face-vintage .vface{ padding:18px 22px 20px }
 body.mini.face-vintage .vbrand small,
 body.mini.face-vintage .vdial-bezel,
 body.mini.face-vintage .vgroup-tune,
 body.mini.face-vintage #vEq,
 body.mini.face-vintage #veqSlot{ display:none }
-body.mini.face-vintage .vtop{ margin-bottom:10px }
-body.mini.face-vintage .vmeters{ gap:8px }
-body.mini.face-vintage .vmeter{ width:78px; height:38px; padding:2px }
-body.mini.face-vintage .vcontrols{ margin-top:0; gap:12px }
-body.mini.face-vintage .vkeys{ gap:5px }
-body.mini.face-vintage button.vkey{ min-width:40px; height:24px; font-size:7px; letter-spacing:.12em }
+body.mini.face-vintage .vtop{ margin-bottom:14px }
+body.mini.face-vintage .vmeters{ gap:10px }
+body.mini.face-vintage .vmeter{ width:88px; height:52px; padding:2px }
+body.mini.face-vintage .vcontrols{ margin-top:0; gap:14px }
+body.mini.face-vintage .vkeys{ gap:6px }
+body.mini.face-vintage button.vkey{ min-width:48px; height:28px; font-size:8px; letter-spacing:.12em }
 body.mini.face-vintage button.vkey .vdot{ width:5px; height:5px; top:4px; right:5px }
 body.mini.face-vintage .vgroup .vlbl{ font-size:7px }
-body.mini.face-vintage .vknob{ width:40px; height:40px }
+body.mini.face-vintage .vknob{ width:54px; height:54px }
 body.mini.face-vintage .vbrand .vname{ font-size:19px }
