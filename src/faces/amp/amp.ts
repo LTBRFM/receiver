@@ -30,8 +30,6 @@ const BADGE = "#b9d0ff";
 const BADGE_INK = "#0b1f66";
 const BADGE_DIM = "#1f3f9a";
 const BADGE_DIM_INK = "#6f8fdc";
-const BAR_LO = "#5f92ff";
-const BAR_HI = "#a9c8ff";
 const PEAK = "#ffffff";
 
 const BARS = 20;
@@ -156,6 +154,110 @@ function titleLine(): string {
 }
 
 // ---- main display ----------------------------------------------------------------
+//
+// Laid out as the classic skin: readouts across the top (time, kbps / kHz,
+// STEREO and NO DJ) with the analyser on the right, and the title on its own
+// darker band along the foot. The glass is painted here too — a domed sheen
+// across the top and a soft vignette — rather than left to CSS, so the
+// highlights curve with the corners.
+
+const RADIUS = 5;
+const PAD = 10;
+const BAND_H = 34; // the title band along the foot
+
+function roundedRect(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  c.beginPath();
+  if (typeof c.roundRect === "function") c.roundRect(x, y, w, h, r);
+  else c.rect(x, y, w, h);
+}
+
+function drawGlass(c: CanvasRenderingContext2D, w: number, h: number) {
+  // body: royal blue fading to navy
+  const g = c.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, "#2d5ad1");
+  g.addColorStop(0.35, "#153a9c");
+  g.addColorStop(1, "#0a1d5e");
+  c.fillStyle = g;
+  c.fillRect(0, 0, w, h);
+
+  // title band along the foot: darker, with a lit lower lip
+  c.fillStyle = "rgba(3,12,48,.42)";
+  c.fillRect(0, h - BAND_H, w, BAND_H);
+  c.fillStyle = "rgba(0,0,0,.35)";
+  c.fillRect(0, h - BAND_H, w, 1);
+  c.fillStyle = "rgba(160,190,255,.16)";
+  c.fillRect(0, h - BAND_H + 1, w, 1);
+
+  // domed sheen: a wide ellipse of light whose curved lower edge shows
+  c.save();
+  c.beginPath();
+  c.ellipse(w * 0.42, -h * 0.55, w * 0.72, h * 0.95, 0, 0, Math.PI * 2);
+  c.clip();
+  const sheen = c.createLinearGradient(0, 0, 0, h * 0.42);
+  sheen.addColorStop(0, "rgba(255,255,255,.26)");
+  sheen.addColorStop(1, "rgba(255,255,255,.06)");
+  c.fillStyle = sheen;
+  c.fillRect(0, 0, w, h * 0.42);
+  c.restore();
+
+  // specular kiss at the top-left corner
+  const spec = c.createRadialGradient(w * 0.12, 2, 2, w * 0.12, 2, w * 0.22);
+  spec.addColorStop(0, "rgba(255,255,255,.20)");
+  spec.addColorStop(1, "rgba(255,255,255,0)");
+  c.fillStyle = spec;
+  c.fillRect(0, 0, w * 0.4, h * 0.5);
+
+  // vignette into the bezel
+  const vig = c.createRadialGradient(w / 2, h * 0.6, w * 0.25, w / 2, h * 0.6, w * 0.75);
+  vig.addColorStop(0, "rgba(0,0,0,0)");
+  vig.addColorStop(1, "rgba(0,0,0,.28)");
+  c.fillStyle = vig;
+  c.fillRect(0, 0, w, h);
+
+  // inner shadow along the top edge, where the glass sits under the bezel
+  const lip = c.createLinearGradient(0, 0, 0, 6);
+  lip.addColorStop(0, "rgba(0,0,0,.45)");
+  lip.addColorStop(1, "rgba(0,0,0,0)");
+  c.fillStyle = lip;
+  c.fillRect(0, 0, w, 6);
+}
+
+function drawAnalyser(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+  // recessed window with the classic dotted backdrop
+  c.fillStyle = "rgba(3,12,48,.45)";
+  roundedRect(c, x - 3, y - 3, w + 6, h + 6, 3);
+  c.fill();
+  c.fillStyle = "rgba(130,165,255,.18)";
+  for (let gy = y + h - 1; gy > y; gy -= 4) {
+    for (let gx = x + 1; gx < x + w; gx += 4) c.fillRect(gx, gy, 1, 1);
+  }
+
+  const gap = 2;
+  const barW = Math.floor((w - gap * (BARS - 1)) / BARS);
+  const span = barW * BARS + gap * (BARS - 1);
+  const x0 = x + Math.floor((w - span) / 2);
+  const grad = c.createLinearGradient(0, y + h, 0, y);
+  grad.addColorStop(0, "#3f74e6");
+  grad.addColorStop(0.55, "#8db6ff");
+  grad.addColorStop(1, "#eaf2ff");
+  for (let i = 0; i < BARS; i++) {
+    const v = Math.min(1, targets[i] * (1 + (i / BARS) * 0.35) * 0.85);
+    levels[i] += (v - levels[i]) * (v > levels[i] ? 0.6 : 0.14);
+    peaks[i] = Math.max(peaks[i] - 0.012, levels[i]);
+    const bx = x0 + i * (barW + gap);
+    // quantised to 2px steps, like a segmented meter
+    const hgt = Math.floor((levels[i] * h) / 2) * 2;
+    if (hgt > 0) {
+      c.fillStyle = grad;
+      c.fillRect(bx, y + h - hgt, barW, hgt);
+    }
+    const ph = Math.floor((peaks[i] * h) / 2) * 2;
+    if (ph > 1) {
+      c.fillStyle = PEAK;
+      c.fillRect(bx, y + h - ph - 1, barW, 1);
+    }
+  }
+}
 
 function drawMain(dt: number) {
   if (!fit(main)) return;
@@ -165,89 +267,79 @@ function drawMain(dt: number) {
   const live = state === "live";
   const blink = Math.floor(Date.now() / 500) % 2 === 0;
 
-  // -- play-state glyph
+  c.save();
+  roundedRect(c, 0, 0, w, h, RADIUS);
+  c.clip();
+  drawGlass(c, w, h);
+
+  // -- play-state glyph, then the time, big
+  const top = 14;
   c.fillStyle = INK;
   if (live) {
-    c.beginPath(); c.moveTo(8, 12); c.lineTo(8, 22); c.lineTo(15, 17); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(PAD, top + 6); c.lineTo(PAD, top + 16); c.lineTo(PAD + 7, top + 11); c.closePath(); c.fill();
   } else if (state === "tuning") {
-    if (blink) { c.fillRect(7, 12, 3, 10); c.fillRect(12, 12, 3, 10); }
+    if (blink) { c.fillRect(PAD - 1, top + 6, 3, 10); c.fillRect(PAD + 4, top + 6, 3, 10); }
   } else {
-    c.fillRect(8, 13, 8, 8);
+    c.fillRect(PAD, top + 7, 8, 8);
   }
-
-  // -- time, big
   const t = live
     ? (() => { const e = elapsedMs(); return e === null ? "0:00" : fmtTime(e); })()
     : state === "tuning" ? (blink ? "-:--" : "    ") : "0:00";
-  text(c, t.padStart(5, " "), 22, 8, 3, INK);
+  const timeX = PAD + 16;
+  const timeW = text(c, t.padStart(5, " "), timeX, top, 3, INK);
 
-  // -- readouts
+  // -- readouts, two evenly spaced rows after the time
   const kbps = player.getBitrateKbps() || player.getStation()?.bitrateKbps || 0;
   const khz = Math.round(player.getSampleRate() / 1000);
-  let x = 132;
-  x += text(c, "KBPS", x, 10, 1, live ? INK : INK_DIM) + 4;
-  x += badge(c, live && kbps ? String(kbps) : "---", x, 8, live, 26) + 10;
-  x += text(c, "KHZ", x, 10, 1, live ? INK : INK_DIM) + 4;
-  badge(c, live && khz ? String(khz) : "--", x, 8, live, 22);
+  const rx = timeX + timeW + 20;
+  let x = rx;
+  x += text(c, "KBPS", x, top + 2, 1, live ? INK : INK_DIM) + 5;
+  x += badge(c, live && kbps ? String(kbps) : "---", x, top, live, 28) + 12;
+  x += text(c, "KHZ", x, top + 2, 1, live ? INK : INK_DIM) + 5;
+  x += badge(c, live && khz ? String(khz) : "--", x, top, live, 24);
+  const readoutsEnd = x;
 
-  x = 132;
-  x += badge(c, "STEREO", x, 26, live) + 6;
+  x = rx;
+  x += badge(c, "STEREO", x, top + 22, live) + 8;
   // NO DJ blinks while the other mount is being brought in.
-  badge(c, "NO DJ", x, 26, player.isSwitching() ? blink : player.getNoDj());
+  badge(c, "NO DJ", x, top + 22, player.isSwitching() ? blink : player.getNoDj());
 
-  // -- analyser, top right
-  const specW = BARS * 5 - 1;
-  const sx = w - 8 - specW;
-  const sy = 8;
-  const sh = 32;
-  for (let i = 0; i < BARS; i++) {
-    const v = Math.min(1, targets[i] * (1 + (i / BARS) * 0.35) * 0.8);
-    levels[i] += (v - levels[i]) * (v > levels[i] ? 0.6 : 0.14);
-    peaks[i] = Math.max(peaks[i] - 0.012, levels[i]);
-    const hgt = Math.round(levels[i] * sh);
-    const bx = sx + i * 5;
-    if (hgt > 0) {
-      const g = c.createLinearGradient(0, sy + sh - hgt, 0, sy + sh);
-      g.addColorStop(0, BAR_HI);
-      g.addColorStop(1, BAR_LO);
-      c.fillStyle = g;
-      c.fillRect(bx, sy + sh - hgt, 4, hgt);
-    }
-    const ph = Math.round(peaks[i] * sh);
-    if (ph > 1) {
-      c.fillStyle = PEAK;
-      c.fillRect(bx, sy + sh - ph, 4, 1);
-    }
-  }
-  // baseline under the analyser
-  c.fillStyle = INK_DIM;
-  c.fillRect(sx, sy + sh + 2, specW, 1);
+  // -- analyser: everything to the right of the readouts
+  const specX = readoutsEnd + 22;
+  drawAnalyser(c, specX, top - 2, w - PAD - specX, 40);
 
-  // -- title line, scrolling when it does not fit
+  // -- title band: scrolling when it does not fit
   const line = titleLine().toUpperCase();
   if (line !== scrollText) {
     scrollText = line;
     scrollX = 0;
   }
   const scale = 2;
-  const pad = 8;
-  const avail = w - pad * 2;
+  const avail = w - PAD * 2;
   const tw = textWidth(line, scale);
-  const ty = h - 8 - ROWS * scale;
+  const ty = h - BAND_H + Math.round((BAND_H - ROWS * scale) / 2);
   c.save();
   c.beginPath();
-  c.rect(pad, ty - 2, avail, ROWS * scale + 4);
+  c.rect(PAD, h - BAND_H, avail, BAND_H);
   c.clip();
   if (tw <= avail) {
-    text(c, line, pad, ty, scale, INK);
+    text(c, line, PAD, ty, scale, INK);
   } else {
     const loop = line + "  ***  ";
     const lw = textWidth(loop, scale);
     if (live || state === "tuning") scrollX = (scrollX + dt * 0.03) % lw;
     const off = Math.floor(scrollX / scale) * scale;
-    text(c, loop, pad - off, ty, scale, INK);
-    text(c, loop, pad - off + lw, ty, scale, INK);
+    text(c, loop, PAD - off, ty, scale, INK);
+    text(c, loop, PAD - off + lw, ty, scale, INK);
   }
+  c.restore();
+
+  // -- a last curved glint over everything, faint enough to read through
+  const glint = c.createLinearGradient(0, 0, 0, h * 0.3);
+  glint.addColorStop(0, "rgba(255,255,255,.07)");
+  glint.addColorStop(1, "rgba(255,255,255,0)");
+  c.fillStyle = glint;
+  c.fillRect(0, 0, w, h * 0.3);
   c.restore();
 }
 

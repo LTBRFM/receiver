@@ -317,6 +317,7 @@ fn emit_fault(app: &AppHandle, fault: &Fault) {
 /// `failed` when a switch was abandoned — `url` is then the mount that kept
 /// playing.
 #[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 struct SourcePayload<'a> {
     url: &'a str,
     phase: &'static str,
