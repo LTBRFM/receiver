@@ -491,11 +491,13 @@ function moveEqOut() {
 // ---- activation ---------------------------------------------------------------------------
 
 let volFader: { set(v: number): void; get(): number };
+let shadeVolFader: { set(v: number): void; get(): number };
 
 function activate() {
   active = true;
   moveEqIn();
   volFader.set(player.getUserVolume() * 100);
+  shadeVolFader.set(player.getUserVolume() * 100);
   syncTransport();
   syncEqPanel();
   drawCurve();
@@ -568,6 +570,19 @@ export function initAmp() {
     format: (n) => Math.round(n) + "%",
     onChange: (n) => { if (active) player.setUserVolume(n / 100); },
   });
+  // Shade mode has its own small fader. Only one of the two is ever visible,
+  // so they are brought level whenever the mode flips rather than chained.
+  shadeVolFader = makeFader($("aShadeVol"), {
+    min: 0, max: 100, value: player.getUserVolume() * 100, vertical: false,
+    format: (n) => Math.round(n) + "%",
+    onChange: (n) => { if (active) player.setUserVolume(n / 100); },
+  });
+  new MutationObserver(() => {
+    if (!active) return;
+    const v = player.getUserVolume() * 100;
+    volFader.set(v);
+    shadeVolFader.set(v);
+  }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
 
   // -- side keys
   $("aNoDj").addEventListener("click", () => player.setNoDj(!player.getNoDj()));
@@ -621,7 +636,7 @@ export function initAmp() {
     "#faceAmp", ".atitle", ".agrip", ".aname", ".amain", ".arow", ".alcd", "#aDisplay",
     ".aside", ".atransport", ".aroundkeys",
     ".aeqpanel", ".aeqleft", ".aeqscale", ".aeqscale span", "#aCurve", ".ashade",
-    ".ashade-lcd", "#aShadeDisplay", ".amenu",
+    ".ashade-lcd", "#aShadeDisplay", ".amenu", ".ashade-vol",
   ]) {
     document.querySelectorAll<HTMLElement>(sel).forEach((el) => {
       el.setAttribute("data-tauri-drag-region", "");

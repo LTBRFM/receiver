@@ -495,12 +495,30 @@ const ctxMenu = document.getElementById("ctxMenu")!;
 const ctxOnTop = document.getElementById("ctxOnTop")!;
 let alwaysOnTop = false;
 
+let ctxGrew = false;
+
 function closeCtxMenu() {
+  if (!ctxMenu.classList.contains("open")) return;
   ctxMenu.classList.remove("open");
+  if (ctxGrew) {
+    ctxGrew = false;
+    fitWindow().catch((e) => console.error("fitWindow failed:", e));
+  }
 }
 
-function openCtxMenu(cx: number, cy: number) {
+async function openCtxMenu(cx: number, cy: number) {
   ctxMenu.classList.add("open");
+  // A face folded into a bar (Amp's shade mode) is shorter than the menu.
+  // Grow the window for as long as the menu is open; closing refits it.
+  const need = ctxMenu.offsetHeight + 12;
+  if (window.innerHeight < need) {
+    ctxGrew = true;
+    try {
+      await resizeTo(window.innerWidth, need);
+    } catch (e) {
+      console.error("setSize failed:", e);
+    }
+  }
   // Clamp so the menu never opens past the window edge.
   const x = Math.min(cx, window.innerWidth - ctxMenu.offsetWidth - 6);
   const y = Math.min(cy, window.innerHeight - ctxMenu.offsetHeight - 6);
@@ -514,7 +532,7 @@ document.addEventListener("contextmenu", (e) => {
   e.preventDefault();
   // Always use our own HTML menu: it carries app-level items (face
   // selection) that a window manager's menu can never show.
-  openCtxMenu(e.clientX, e.clientY);
+  openCtxMenu(e.clientX, e.clientY).catch((err) => console.error("openCtxMenu failed:", err));
 });
 
 document.addEventListener("pointerdown", (e) => {
@@ -525,8 +543,8 @@ document.addEventListener("keydown", (e) => {
 });
 window.addEventListener("blur", closeCtxMenu);
 
-// Note: on Linux/Wayland compositors ignore the keep-above request (no
-// protocol for it); the toggle still reflects what was asked of the OS.
+// Note: Wayland has no keep-above protocol, which is why main.rs runs the
+// app through XWayland on Wayland sessions — there the request is honoured.
 ctxOnTop.addEventListener("click", () => {
   alwaysOnTop = !alwaysOnTop;
   ctxOnTop.setAttribute("aria-checked", String(alwaysOnTop));
@@ -650,6 +668,27 @@ player.onSpectrum((bars) => setSpectrum(bars));
 // renders text more compactly than macOS/Windows), so heights are always
 // measured rather than hard-coded; the only precondition is that the
 // bundled fonts have finished loading.
+// Size the native window to exactly (w, h). The window is declared
+// resizable and then pinned with min = max = the fitted size: on GTK a
+// non-resizable window is sized to its content's *natural* size, and
+// WebKitGTK's web view reports a natural height of 200px, so anything
+// shorter (Amp's shade bar) was silently clamped. With the pin the user still
+// cannot resize it, and every height is honoured.
+async function resizeTo(w: number, h: number) {
+  const win = getCurrentWindow();
+  const size = new LogicalSize(w, h);
+  // Hints must stay consistent along the way: raise max before min when
+  // growing, lower min before max when shrinking.
+  if (w > window.innerWidth || h > window.innerHeight) {
+    await win.setMaxSize(size);
+    await win.setMinSize(size);
+  } else {
+    await win.setMinSize(size);
+    await win.setMaxSize(size);
+  }
+  await win.setSize(size);
+}
+
 async function fitWindow() {
   await document.fonts.ready;
   const root = document.getElementById(
@@ -659,7 +698,7 @@ async function fitWindow() {
   const h = Math.ceil(root.offsetHeight);
   if (!w || !h) return; // hidden or not laid out yet — nothing to trust
   if (Math.abs(window.innerWidth - w) > 1 || Math.abs(window.innerHeight - h) > 1) {
-    await getCurrentWindow().setSize(new LogicalSize(w, h));
+    await resizeTo(w, h);
   }
 }
 

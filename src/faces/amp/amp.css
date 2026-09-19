@@ -38,6 +38,9 @@
   overflow:hidden;
   user-select:none;
 }
+/* the window is transparent (rounded corners) — shadows are painted by the
+   window manager, so none here */
+.aunit{ box-shadow:0 1px 0 var(--a-silver-hi) inset, 0 0 0 1px rgba(255,255,255,.55) inset, 0 -2px 0 var(--a-silver-lo) inset }
 
 /* ---------- title bar ---------- */
 
@@ -325,8 +328,12 @@ body.mini.face-amp .amain,
 body.mini.face-amp .aeqpanel{ display:none }
 body.mini.face-amp .atitle{ height:24px }
 body.mini.face-amp .ashade{
-  display:flex; align-items:center; gap:4px; padding:3px 6px 4px;
+  display:flex; align-items:center; gap:4px; padding:3px 6px 5px;
 }
+.ashade-vol{ width:70px; flex:none; display:flex; align-items:center; margin:0 2px }
+.ashade-vol .fader-h.afader{ height:16px }
+.ashade-vol .afader .slot{ top:6px; height:4px }
+.ashade-vol .afader .cap{ width:18px; height:12px; top:2px; margin-left:-9px; border-radius:6px }
 .ashade-lcd{
   flex:1; min-width:0; padding:3px; border-radius:7px;
   background:linear-gradient(180deg, #2b3d78, #101c45);

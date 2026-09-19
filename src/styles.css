@@ -448,6 +448,10 @@ body.mini:not(.face-vintage) .transport{ margin-top:0; gap:16px; flex-wrap:nowra
 body.mini:not(.face-vintage) .vol{ margin-left:0; flex:1 1 auto }
 body.mini:not(.face-vintage) .fader-h{ width:100%; min-width:60px }
 
+/* The Amp face has rounded corners, so its window is transparent and the
+   page shows the desktop through them; every other face fills its window. */
+body.face-amp{ background:transparent }
+
 @media (prefers-reduced-motion: reduce){
   *{ animation:none !important; transition:none !important }
 }
