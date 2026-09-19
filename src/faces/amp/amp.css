@@ -229,19 +229,12 @@ button.aeject:focus-visible{ outline:2px solid var(--a-blue); outline-offset:2px
 button.atab{
   height:22px; padding:0 14px; border:none; cursor:pointer;
   border-radius:9px 9px 0 0; font-family:inherit; font-size:9px; font-weight:900; letter-spacing:.2em;
-  color:var(--a-edge); align-self:flex-end; margin-bottom:-6px;
+  color:var(--a-edge); align-self:flex-end; margin:0 4px -6px 2px;
   background:linear-gradient(180deg, var(--a-silver-hi), var(--a-silver));
   box-shadow:0 0 0 1.5px var(--a-edge);
 }
 button.atab[aria-pressed="true"]{ background:linear-gradient(180deg,#c9d3ea,#b4c2e6); color:var(--a-blue-deep) }
 button.atab:focus-visible{ outline:2px solid var(--a-blue); outline-offset:1px }
-button.abolt{
-  width:22px; height:24px; border:none; background:none; cursor:pointer; padding:0;
-  color:#f0a22a; filter:drop-shadow(0 1px 0 rgba(255,255,255,.7));
-}
-button.abolt svg{ width:12px; height:16px; fill:currentColor }
-button.abolt:hover{ color:#ffbe55 }
-button.abolt:focus-visible{ outline:2px solid var(--a-blue); outline-offset:2px; border-radius:3px }
 
 /* ---------- equaliser panel ---------- */
 
@@ -261,6 +254,8 @@ button.abolt:focus-visible{ outline:2px solid var(--a-blue); outline-offset:2px;
   background:linear-gradient(180deg, #3157c8 0%, #2247ad 50%, #1a3a97 100%);
   box-shadow:0 1px 3px rgba(0,0,0,.5) inset, 0 0 0 1.5px var(--a-edge);
 }
+/* the docked equaliser takes all the width the left column and scale leave */
+#aeqSlot{ flex:1; min-width:0; display:flex }
 .aeqscale{
   display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end;
   padding:4px 0 50px; width:36px; flex:none;

@@ -555,7 +555,6 @@ export function initAmp() {
   }
   $("aMenuPlay").addEventListener("click", () => $("aPlay").click());
   $("aMenuHelp").addEventListener("click", () => cmd("open_home_page"));
-  $("aBolt").addEventListener("click", () => cmd("open_home_page"));
 
   // -- transport
   const play = () => { if (player.getState() !== "live" && player.getState() !== "tuning") player.play(); };
