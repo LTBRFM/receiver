@@ -81,6 +81,25 @@ export interface SyncInfo {
 }
 
 export const DEFAULT_URL = "https://stream.ltbr.fm/live";
+/** The same programme without the presenters — jingles and music only. */
+export const NODJ_URL = "https://stream.ltbr.fm/live-nodj";
+
+/** A classified failure: `code` picks a short indicator text, `message` is
+ *  the full story for a tooltip. Codes come from the engine: device, connect,
+ *  timeout, http, dropped, network, decode. */
+export interface Fault {
+  code: string;
+  message: string;
+}
+
+/** Which mount the engine has on air (or is bringing in). */
+export interface SourceInfo {
+  url: string;
+  phase: "switching" | "live" | "failed";
+  reason?: string;
+  aligned?: boolean;
+  confidence?: number;
+}
 
 // Fire-and-forget command helper — the engine is authoritative, so a failed
 // command must never take down the UI.
@@ -93,10 +112,12 @@ export function cmd(name: string, args?: Record<string, unknown>): void {
 type StateCb = (s: EngineState, message?: string) => void;
 type TitleCb = (title: string) => void;
 type SpectrumCb = (bars: number[]) => void;
-type FaultCb = (message: string) => void;
+type FaultCb = (fault: Fault | null) => void;
 type MuteCb = (muted: boolean) => void;
 type MetaCb = (m: Metadata) => void;
 type SyncCb = (s: SyncInfo) => void;
+type NoDjCb = (on: boolean, switching: boolean) => void;
+type SourceCb = (s: SourceInfo) => void;
 
 const stateCbs: StateCb[] = [];
 const titleCbs: TitleCb[] = [];
@@ -105,6 +126,8 @@ const faultCbs: FaultCb[] = [];
 const muteCbs: MuteCb[] = [];
 const metaCbs: MetaCb[] = [];
 const syncCbs: SyncCb[] = [];
+const noDjCbs: NoDjCb[] = [];
+const sourceCbs: SourceCb[] = [];
 
 let engineState: EngineState = "standby";
 let nowPlaying = "";
@@ -115,6 +138,7 @@ let anchor: { playheadMs: number; at: number } | null = null;
 let userVolume = 0.8;
 let signalFactor = 1;
 let muted = false;
+let fault: Fault | null = null;
 
 export function onState(cb: StateCb) { stateCbs.push(cb); }
 export function onNowPlaying(cb: TitleCb) { titleCbs.push(cb); }
@@ -123,6 +147,8 @@ export function onFault(cb: FaultCb) { faultCbs.push(cb); }
 export function onMuteChange(cb: MuteCb) { muteCbs.push(cb); }
 export function onMetadata(cb: MetaCb) { metaCbs.push(cb); }
 export function onSync(cb: SyncCb) { syncCbs.push(cb); }
+export function onNoDjChange(cb: NoDjCb) { noDjCbs.push(cb); }
+export function onSource(cb: SourceCb) { sourceCbs.push(cb); }
 
 export function getState(): EngineState { return engineState; }
 export function getNowPlaying(): string { return nowPlaying; }
@@ -130,6 +156,53 @@ export function getUserVolume(): number { return userVolume; }
 export function getMuted(): boolean { return muted; }
 export function getMetadata(): Metadata | null { return metadata; }
 export function getStation(): Station | null { return station; }
+export function getFault(): Fault | null { return fault; }
+
+// ---- DJ / no-DJ source -------------------------------------------------------
+//
+// One preference shared by every face. Off air it just decides which mount
+// the next Play opens; on air it asks the engine for a seamless switch and
+// stays "switching" until the engine confirms which mount it landed on — the
+// engine is authoritative, so a failed switch snaps the toggle back.
+
+const NODJ_KEY = "ltbrfm.nodj";
+let noDj = savedNoDj();
+let switching = false;
+
+function savedNoDj(): boolean {
+  try {
+    return localStorage.getItem(NODJ_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function notifyNoDj() {
+  for (const cb of noDjCbs) cb(noDj, switching);
+}
+
+export function getNoDj(): boolean { return noDj; }
+export function isSwitching(): boolean { return switching; }
+
+/** The mount the listener has asked for. */
+export function currentUrl(): string {
+  return noDj ? NODJ_URL : DEFAULT_URL;
+}
+
+export function setNoDj(on: boolean) {
+  if (on === noDj) return;
+  noDj = on;
+  try {
+    localStorage.setItem(NODJ_KEY, on ? "1" : "0");
+  } catch {
+    /* private mode — the choice just won't persist */
+  }
+  if (engineState === "live" || engineState === "tuning") {
+    switching = true;
+    cmd("switch", { url: currentUrl() });
+  }
+  notifyNoDj();
+}
 
 /** Where the listener is on the station's timeline, interpolated forward from
  *  the last block. Null until one has arrived. */
@@ -145,18 +218,21 @@ function emitState(s: EngineState, message?: string) {
 
 // ---- transport ---------------------------------------------------------------
 
-export function play(url: string = DEFAULT_URL) {
+export function play(url: string = currentUrl()) {
+  if (fault) setFault(null);
   emitState("tuning", "acquiring…");
   cmd("play", { url });
 }
 
 export function pause() {
   cmd("pause");
+  if (fault) setFault(null);
   emitState("standby", "paused");
 }
 
 export function stop() {
   cmd("stop");
+  if (fault) setFault(null);
   nowPlaying = "";
   metadata = null;
   anchor = null;
@@ -197,16 +273,50 @@ export function setMuted(m: boolean) {
 interface StateEvent {
   state: EngineState;
   message?: string;
+  code?: string;
+}
+
+function setFault(f: Fault | null) {
+  fault = f;
+  for (const cb of faultCbs) cb(f);
 }
 
 export function initPlayer() {
   listen<StateEvent>("state", (e) => {
-    emitState(e.payload.state, e.payload.message);
-    if (e.payload.state === "error" && e.payload.message) {
-      for (const cb of faultCbs) cb(e.payload.message);
-    } else if (e.payload.state !== "error") {
-      for (const cb of faultCbs) cb("");
+    const { state, message, code } = e.payload;
+    // A fault stands while the engine is reconnecting ("tuning" after a
+    // drop) — only a carrier, or the listener stopping, clears it.
+    if (state === "error") {
+      setFault({ code: code ?? "error", message: message ?? "Error" });
+    } else if (state === "live" || state === "standby") {
+      if (fault) setFault(null);
     }
+    emitState(state, message);
+  });
+
+  listen<Fault>("fault", (e) => {
+    setFault(e.payload);
+  });
+
+  listen<SourceInfo>("source", (e) => {
+    const s = e.payload;
+    if (s.phase === "switching") {
+      switching = true;
+    } else {
+      switching = false;
+      // The engine says what is actually on air; follow it.
+      const on = s.url === NODJ_URL;
+      if (on !== noDj) {
+        noDj = on;
+        try {
+          localStorage.setItem(NODJ_KEY, on ? "1" : "0");
+        } catch {
+          /* private mode */
+        }
+      }
+    }
+    notifyNoDj();
+    for (const cb of sourceCbs) cb(s);
   });
 
   listen<{ title: string }>("nowplaying", (e) => {
@@ -224,10 +334,6 @@ export function initPlayer() {
 
   listen<SyncInfo>("sync", (e) => {
     for (const cb of syncCbs) cb(e.payload);
-  });
-
-  listen<{ message: string }>("fault", (e) => {
-    for (const cb of faultCbs) cb(e.payload.message);
   });
 
   listen<number[]>("spectrum", (e) => {

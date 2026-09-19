@@ -168,6 +168,7 @@ function setPowered(on: boolean) {
   const btn = document.getElementById("vPower")!;
   btn.setAttribute("aria-pressed", String(on));
   document.getElementById("faceVintage")!.classList.toggle("vpowered", on);
+  syncLamps();
   if (on) {
     noise.start();
     // NB: stationHeld is left as-is — activate() pre-holds it when a stream
@@ -297,6 +298,28 @@ function syncMuteButton() {
     .setAttribute("aria-pressed", String(player.getMuted()));
 }
 
+// NO DJ key: latching, with a pilot lamp that glows while the no-DJ mount is
+// on air and flickers while the engine crossfades over to the other mount.
+function syncNoDjKey(on: boolean, switching: boolean) {
+  const key = document.getElementById("vNoDj")!;
+  key.setAttribute("aria-pressed", String(on));
+  key.classList.toggle("vpending", switching);
+}
+
+// Pilot lamps under the wordmark. TUNED follows the carrier; NO SIGNAL lights
+// on a fault and pulses while the set is hunting for the station again. The
+// full reason is a tooltip, never text on the fascia.
+function syncLamps() {
+  const state = player.getState();
+  const fault = player.getFault();
+  const tuned = document.getElementById("vLampTuned")!;
+  const faultLamp = document.getElementById("vLampFault")!;
+  tuned.classList.toggle("lit", powered && state === "live");
+  faultLamp.classList.toggle("lit", powered && fault !== null);
+  faultLamp.classList.toggle("hunting", powered && fault !== null && state === "tuning");
+  faultLamp.title = fault?.message ?? "";
+}
+
 // ---- init -----------------------------------------------------------------------
 
 export function initVintage() {
@@ -330,6 +353,15 @@ export function initVintage() {
     syncMuteButton();
   });
 
+  document.getElementById("vNoDj")!.addEventListener("click", () => {
+    player.setNoDj(!player.getNoDj());
+  });
+  player.onNoDjChange(syncNoDjKey);
+  syncNoDjKey(player.getNoDj(), player.isSwitching());
+
+  player.onState(syncLamps);
+  player.onFault(syncLamps);
+
   // The vintage EQ key drives the shared toggle on the default face, so the
   // panel state and window fit stay owned by one place.
   document.getElementById("vEq")!.addEventListener("click", () => {
@@ -352,6 +384,7 @@ export function initVintage() {
     "#faceVintage", ".vface", ".vtop", ".vbrand", ".vbrand small",
     ".vmeters", ".vmeter", ".vdial-bezel", "#vDial", "#vVuL", "#vVuR",
     ".vcontrols", ".vgroup", ".vgroup .vlbl", "#veqSlot",
+    ".vlamps", ".vlamp",
   ];
   for (const sel of DRAG) {
     document.querySelectorAll<HTMLElement>(sel).forEach((el) => {

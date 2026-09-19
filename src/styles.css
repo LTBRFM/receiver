@@ -266,6 +266,31 @@ button.key[aria-pressed="true"]{
 button.key:focus-visible{ outline:2px solid var(--focus); outline-offset:2px }
 button.key svg{ width:15px;height:15px; fill:currentColor }
 
+/* Labelled latching key (NO DJ): engraved caps + a recessed LED that lights
+   when the key is down. While a switch is in flight the LED blinks — the
+   other mount is being tuned in behind the one still playing. */
+button.key.key-text{
+  width:auto; padding:0 12px 0 10px; gap:8px;
+  font-family:inherit; font-size:8px; font-weight:900;
+  letter-spacing:.2em; text-transform:uppercase;
+  text-shadow:0 1px 0 rgba(0,0,0,.6);
+}
+.key-led{
+  width:6px; height:6px; border-radius:50%; flex:none;
+  background:#0b0a09;
+  box-shadow:0 1px 1px rgba(0,0,0,.8) inset, 0 1px 0 rgba(255,255,255,.06);
+}
+button.key[aria-pressed="true"] .key-led{
+  background:var(--amber);
+  box-shadow:0 0 5px rgba(255,155,33,.85), 0 0 0 1px rgba(0,0,0,.4) inset;
+}
+button.key.pending .key-led{
+  background:var(--amber);
+  box-shadow:0 0 5px rgba(255,155,33,.85), 0 0 0 1px rgba(0,0,0,.4) inset;
+  animation:keyblink .5s steps(2,end) infinite;
+}
+@keyframes keyblink{ 50%{ opacity:.15 } }
+
 .vol{ margin-left:auto; display:flex; align-items:center; gap:11px }
 .vol .lbl{ font-size:8px; letter-spacing:.3em; text-transform:uppercase; color:var(--concrete-dim) }
 
@@ -343,44 +368,6 @@ button.chip:focus-visible{ outline:2px solid var(--focus); outline-offset:2px }
 .rule{ width:1px; align-self:stretch; background:rgba(0,0,0,.45);
        box-shadow:1px 0 0 rgba(255,255,255,.05); margin:0 5px }
 
-/* ---------- Source row ---------- */
-
-.source{
-  /* 20px ≈ the 18px gap above the EQ title — symmetric breathing room
-     around the equaliser block. */
-  margin-top:20px; padding-top:16px;
-  border-top:1px solid rgba(0,0,0,.45);
-  box-shadow:0 1px 0 rgba(255,255,255,.05) inset;
-  display:flex; gap:10px; align-items:center; flex-wrap:wrap;
-}
-.source label{ font-size:8px; letter-spacing:.3em; text-transform:uppercase; color:var(--concrete-dim) }
-.source input{
-  flex:1; min-width:200px;
-  /* Force our own box model — WebKitGTK otherwise gives <input> a taller
-     native height that ignores padding, making the field look oversized. */
-  appearance:none; -webkit-appearance:none;
-  background:var(--ink); border:1px solid #0a0908; border-radius:2px;
-  box-shadow:0 1px 3px rgba(0,0,0,.8) inset;
-  color:var(--amber); height:22px; padding:0 10px; line-height:20px;
-  font-family:"LTBR Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace; font-size:11px;
-  user-select:text; -webkit-user-select:text;
-}
-.source input:focus{ outline:2px solid var(--focus); outline-offset:1px }
-button.tune{
-  background:linear-gradient(180deg,#4a423a,#2b2620);
-  border:none; border-radius:3px; color:#d3c9ba; cursor:pointer;
-  font-size:9px; letter-spacing:.24em; text-transform:uppercase;
-  height:22px; padding:0 16px; line-height:22px;
-  box-shadow:0 1px 0 rgba(255,255,255,.13) inset, 0 2px 3px rgba(0,0,0,.5);
-}
-button.tune:hover{ color:var(--amber) }
-button.tune:focus-visible{ outline:2px solid var(--focus); outline-offset:2px }
-
-.fault{
-  margin-top:12px; font-size:11px; color:var(--red);
-  font-family:"LTBR Mono",ui-monospace,monospace; letter-spacing:.02em;
-  min-height:15px;
-}
 
 /* ---------- Context menu ---------- */
 
@@ -435,16 +422,14 @@ button.ctx-item[aria-checked="true"] .ctx-led{
 }
 
 /* ---------- Minimised view (default face) ----------
-   Dropping the scroller/spectrum window, the equaliser and the source row
-   leaves just the brand strip and a slim transport bar — about a quarter
+   Dropping the scroller window and the equaliser leaves just the brand
+   strip and a slim transport bar — about a quarter
    of the full faceplate's footprint. The engine and any EQ settings are
    untouched; the panels are only detached from view. */
 body.mini:not(.face-vintage) .unit{ width:360px }
 body.mini:not(.face-vintage) .strap,
 body.mini:not(.face-vintage) .w-scroll,
 body.mini:not(.face-vintage) .eq,
-body.mini:not(.face-vintage) .source,
-body.mini:not(.face-vintage) .fault,
 body.mini:not(.face-vintage) #btnStop,
 body.mini:not(.face-vintage) #btnEq,
 body.mini:not(.face-vintage) .vol .lbl{ display:none }

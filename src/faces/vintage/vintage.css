@@ -65,6 +65,38 @@
   white-space:nowrap;
 }
 
+/* pilot lamps under the wordmark: jewel lens + engraved legend */
+.vlamps{ display:flex; gap:16px; margin-top:2px }
+.vlamp{
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:7px; font-weight:700; letter-spacing:.26em; text-transform:uppercase;
+  color:#6b6352; text-shadow:0 1px 0 rgba(255,255,255,.4);
+  white-space:nowrap;
+}
+.vlamp i{
+  width:7px; height:7px; border-radius:50%; flex:none;
+  /* unlit lens in a chrome collar */
+  background:radial-gradient(circle at 35% 30%, #4a4238, #23201b);
+  box-shadow:0 1px 1px rgba(0,0,0,.55) inset, 0 1px 0 rgba(255,255,255,.4), 0 0 0 1px rgba(60,52,44,.6);
+  transition:background .25s, box-shadow .25s;
+}
+.vlamp-tuned.lit{ color:#3f4a3a }
+.vlamp-tuned.lit i{
+  background:radial-gradient(circle at 35% 30%, #b8ffc9, #3fbf6a 55%, #1d7a3c);
+  box-shadow:0 0 7px rgba(80,220,120,.75), 0 1px 1px rgba(0,0,0,.4) inset, 0 0 0 1px rgba(60,52,44,.6);
+}
+.vlamp-fault.lit{ color:#6e2a1e }
+.vlamp-fault.lit i{
+  background:radial-gradient(circle at 35% 30%, #ff8a70, #d32b12 60%, #7e1506);
+  box-shadow:0 0 7px rgba(255,60,25,.85), 0 1px 1px rgba(0,0,0,.4) inset, 0 0 0 1px rgba(60,52,44,.6);
+}
+/* hunting for the carrier again: slow pulse, like a set with AFC searching */
+.vlamp-fault.lit.hunting i{ animation:vlamp-hunt 1.6s ease-in-out infinite }
+@keyframes vlamp-hunt{
+  0%,100%{ opacity:1 }
+  50%{ opacity:.35 }
+}
+
 .vmeters{ display:flex; gap:12px }
 .vmeter{
   width:132px; height:82px;
@@ -179,6 +211,21 @@ button.vkey .vdot{
   background:radial-gradient(circle at 35% 30%, #ff8a70, #d32b12 60%, #7e1506);
   box-shadow:0 0 7px rgba(255,60,25,.85), 0 1px 1px rgba(0,0,0,.4) inset;
 }
+/* no-DJ pilot lamp — warm amber jewel, distinct from the red power lamp */
+button.vkey#vNoDj .vdot{
+  background:radial-gradient(circle at 35% 30%, #5a4218, #2c200a);
+}
+button.vkey#vNoDj[aria-pressed="true"] .vdot{
+  background:radial-gradient(circle at 35% 30%, #ffe0a0, #f2a52a 60%, #8a5a0e);
+  box-shadow:0 0 7px rgba(255,170,50,.85), 0 1px 1px rgba(0,0,0,.4) inset;
+}
+/* while the engine crossfades to the other mount the lamp flickers */
+button.vkey#vNoDj.vpending .vdot{
+  background:radial-gradient(circle at 35% 30%, #ffe0a0, #f2a52a 60%, #8a5a0e);
+  box-shadow:0 0 7px rgba(255,170,50,.85), 0 1px 1px rgba(0,0,0,.4) inset;
+  animation:vdot-blink .5s steps(2,end) infinite;
+}
+@keyframes vdot-blink{ 50%{ opacity:.15 } }
 
 /* ---------- knobs ---------- */
 
@@ -253,9 +300,9 @@ body.face-vintage .eq.hidden{ display:none }
 
 /* ---------- Minimised view (vintage face) ----------
    Hides the tuning dial and equaliser, and drops the tuning knob (retuning
-   needs the full fascia back) — leaving the brand strip, the VU meters
-   (shrunk, channel labels dropped to save space), the Power/Mute/Mini keys
-   (shrunk) and the volume knob (shrunk), still about a quarter of the
+   needs the full fascia back) — leaving the brand strip with its pilot
+   lamps, the VU meters (shrunk, channel labels dropped to save space), the
+   Power/Mute/No DJ keys (shrunk) and the volume knob (shrunk), still about a quarter of the
    receiver's normal footprint. Powering, muting and any held tuning all
    keep running exactly as before; only the chrome is tucked away. */
 /* Width matches the default face's mini bar (MINI_WIDTH in main.ts) so the
@@ -276,6 +323,10 @@ body.mini.face-vintage .vcontrols{ margin-top:0; gap:14px }
 body.mini.face-vintage .vkeys{ gap:6px }
 body.mini.face-vintage button.vkey{ min-width:48px; height:28px; font-size:8px; letter-spacing:.12em }
 body.mini.face-vintage button.vkey .vdot{ width:5px; height:5px; top:4px; right:5px }
+/* Only the fault lamp fits under the shrunken wordmark; TUNED is implied by
+   the meters moving. */
+body.mini.face-vintage .vlamps{ gap:12px }
+body.mini.face-vintage .vlamp-tuned{ display:none }
 body.mini.face-vintage .vgroup .vlbl{ font-size:7px }
 body.mini.face-vintage .vknob{ width:54px; height:54px }
 body.mini.face-vintage .vbrand .vname{ font-size:19px }

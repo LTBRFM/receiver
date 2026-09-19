@@ -21,7 +21,7 @@ import {
   clearSpectrum,
 } from "./visuals.ts";
 import * as player from "./player.ts";
-import { cmd, DEFAULT_URL } from "./player.ts";
+import { cmd } from "./player.ts";
 import { setFace, savedFace, currentFace, onFaceChange, type FaceId } from "./faces.ts";
 import { initVintage } from "./faces/vintage/vintage.ts";
 import "./faces/vintage/vintage.css";
@@ -212,10 +212,8 @@ for (const sel of [".brand", ".vbrand .vname"]) {
 
 const txState = document.getElementById("txState")!;
 const txLabel = document.getElementById("txLabel")!;
-const faultEl = document.getElementById("fault")!;
 const btnPlay = document.getElementById("btnPlay")!;
 const icoPlay = document.getElementById("icoPlay")!;
-const streamUrl = document.getElementById("streamUrl") as HTMLInputElement;
 
 let engineState: "standby" | "tuning" | "live" | "error" = "standby";
 let nowPlaying = "";
@@ -237,7 +235,9 @@ function refreshTx() {
   } else {
     txState.removeAttribute("role");
     txState.removeAttribute("tabindex");
-    txState.title = "";
+    // The full reason for a lost carrier lives here, out of the way: the
+    // display itself only ever carries the short indicator text.
+    txState.title = player.getFault()?.message ?? "";
   }
 }
 
@@ -328,11 +328,30 @@ function hostOf(u: string): string {
 // countdown, so its text (and therefore its scroll position) only changes
 // when the actual next-up track changes, not once a second.
 //
+// Faults are shown the same way, as a few words on the display rather than
+// a line of red text on the fascia: the top band reads NO CARRIER and the
+// middle band names the reason in a couple of words. The full message is a
+// tooltip on the status block.
+//
 // Everything below reads from the decoded ICY payload, which the engine
 // releases in step with the audio.
 
 const STATION_FALLBACK = "LONDON TOWER BLOCK RADIO";
 const FLASH_MS = 3000;
+
+/** A fault code as a couple of dot-matrix words. */
+function faultLabel(f: player.Fault | null): string {
+  switch (f?.code) {
+    case "device": return "NO AUDIO DEVICE";
+    case "connect":
+    case "timeout":
+    case "network": return "NO CONNECTION";
+    case "http": return "STREAM OFFLINE";
+    case "decode": return "BAD SIGNAL";
+    case "dropped": return "SIGNAL LOST";
+    default: return f ? "FAULT" : "";
+  }
+}
 
 let flashText = "";
 let flashUntil = 0;
@@ -387,7 +406,7 @@ function currentLine(): string {
     const label = meta.now ? segmentLabel(meta.now) : "";
     if (label) return label;
   }
-  return nowPlaying || hostOf(streamUrl.value);
+  return nowPlaying || hostOf(player.currentUrl());
 }
 
 /** "NEXT: artist - track", or a placeholder when told nothing, or empty when
@@ -427,13 +446,16 @@ function renderDisplay() {
     return;
   }
 
+  const fault = player.getFault();
   if (engineState === "tuning") {
-    setLine(0, `${stationName().toUpperCase()} · TUNING ·`);
-    setLine(1, "STAND BY ·");
+    // A fault while tuning is the engine reconnecting after a drop — say
+    // what went wrong instead of a bare "stand by".
+    setLine(0, `${stationName().toUpperCase()} · ${fault ? "NO CARRIER" : "TUNING"} ·`);
+    setLine(1, fault ? `${faultLabel(fault)} · RECONNECTING ·` : "STAND BY ·");
     setLine(2, "");
   } else if (engineState === "error") {
     setLine(0, `${stationName().toUpperCase()} · NO CARRIER ·`);
-    setLine(1, "RETRYING ·");
+    setLine(1, `${faultLabel(fault) || "FAULT"} ·`);
     setLine(2, "");
   } else {
     setScroll(`${STATION_FALLBACK} · PRESS PLAY ·`);
@@ -472,14 +494,8 @@ function applyState(s: typeof engineState) {
   renderDisplay();
 }
 
-function fault(msg: string) {
-  faultEl.textContent = msg || "";
-}
-
 function play() {
-  fault("");
-  const url = streamUrl.value.trim() || DEFAULT_URL;
-  player.play(url); // emits "tuning" back through onState
+  player.play(); // the DJ / no-DJ choice picks the mount; emits "tuning" back through onState
 }
 
 function pause() {
@@ -502,6 +518,18 @@ btnMute.addEventListener("click", () => {
 });
 player.onMuteChange((m) => {
   btnMute.setAttribute("aria-pressed", String(m));
+});
+
+// NO DJ: a latching key. Off air it only decides which mount Play opens; on
+// air the engine brings the other mount in behind the one playing and
+// crossfades — the LED blinks until that has happened.
+const btnNoDj = document.getElementById("btnNoDj")!;
+btnNoDj.addEventListener("click", () => {
+  player.setNoDj(!player.getNoDj());
+});
+player.onNoDjChange((on, switching) => {
+  btnNoDj.setAttribute("aria-pressed", String(on));
+  btnNoDj.classList.toggle("pending", switching);
 });
 
 // EQ show/hide — audio is untouched (the DSP keeps its settings); only the
@@ -582,26 +610,9 @@ function setMinimized(v: boolean) {
   });
 }
 
-document.getElementById("btnTune")!.addEventListener("click", () => {
-  const url = streamUrl.value.trim();
-  if (!url) {
-    fault("Enter a stream URL first.");
-    return;
-  }
-  play();
-});
-
-// Enter in the URL box tunes.
-streamUrl.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    play();
-  }
-});
-
-// Keyboard: space toggles, M mutes — but not while typing or on a slider.
-// Space transport is a default-face affordance; on the vintage face the
-// power key and tuning knob own the audio lifecycle.
+// Keyboard: space toggles, M mutes, E shows the EQ, D toggles No DJ — but
+// not on a slider. Space transport is a default-face affordance; on the
+// vintage face the power key and tuning knob own the audio lifecycle.
 document.addEventListener("keydown", (e) => {
   const t = e.target as HTMLElement;
   if (t.matches("input, [role=slider]")) return;
@@ -612,6 +623,7 @@ document.addEventListener("keydown", (e) => {
   }
   if (e.key.toLowerCase() === "m") (btnMute as HTMLButtonElement).click();
   if (e.key.toLowerCase() === "e") (btnEq as HTMLButtonElement).click();
+  if (e.key.toLowerCase() === "d") (btnNoDj as HTMLButtonElement).click();
 });
 
 // ---- frameless window: power off + drag regions ----------------------------
@@ -636,7 +648,7 @@ const DRAG_REGIONS = [
   ".transport", ".keys", ".vol", ".vol .lbl",
   ".eq", ".eq-head", ".eq-head .title", ".presets", ".bands", ".band",
   ".band .hz", ".band .db", ".rule",
-  ".source", ".source label", ".fault", ".tx", ".screw",
+  ".tx", ".screw",
 ];
 for (const sel of DRAG_REGIONS) {
   document.querySelectorAll<HTMLElement>(sel).forEach((el) => {
@@ -774,7 +786,26 @@ player.onSync((s) => {
   else if (s.action === "reconnect") flashLine2("RESYNC · RETUNING");
 });
 
-player.onFault((m) => fault(m));
+// The engine's word on which mount is on air. A completed switch gets a
+// short confirmation; an abandoned one says so, and the key has already
+// snapped back to the mount that kept playing.
+player.onSource((s) => {
+  if (engineState !== "live") return;
+  // On a failure the key has already snapped back, so the current choice
+  // is the mount that kept playing — the one we could not reach is the other.
+  if (s.phase === "failed") {
+    flashLine2(player.getNoDj() ? "DJ STREAM · UNAVAILABLE" : "NO DJ · UNAVAILABLE");
+  }
+  else if (s.phase === "live" && s.aligned !== undefined) {
+    flashLine2(player.getNoDj() ? "NO DJ · ON" : "NO DJ · OFF");
+  }
+});
+
+// A fault changes both the display text and the status tooltip.
+player.onFault(() => {
+  refreshTx();
+  renderDisplay();
+});
 
 player.onSpectrum((bars) => setSpectrum(bars));
 
@@ -803,6 +834,7 @@ async function fitWindow() {
 player.initPlayer();
 initVisuals();
 initVintage();
+btnNoDj.setAttribute("aria-pressed", String(player.getNoDj()));
 setFace(savedFace());
 setMinimized(savedMinimized(currentFace()));
 applyState("standby");

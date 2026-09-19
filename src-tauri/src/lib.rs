@@ -31,6 +31,13 @@ fn stop(engine: State<Engine>) {
     engine.stop();
 }
 
+/// Move a playing session to another mount without a gap: the new stream is
+/// connected alongside, aligned to what is being heard and crossfaded in.
+#[tauri::command]
+fn switch(engine: State<Engine>, url: String) {
+    engine.switch(url);
+}
+
 #[tauri::command]
 fn set_volume(engine: State<Engine>, level: f32) {
     engine.controls().set_volume(level);
@@ -99,6 +106,7 @@ pub fn run() {
             play,
             pause,
             stop,
+            switch,
             set_volume,
             set_mute,
             set_eq_band,

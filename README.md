@@ -34,8 +34,17 @@ desktop counterpart, downloadable from the same page.
   measures how far behind the live edge you are. Drift beyond 15s is trimmed
   back to the ~8s target, falling back to a silent reconnect if trimming will
   not hold.
+- **No DJ, seamlessly.** A **NO DJ** key on every face swaps between the
+  station's two mounts — the full programme, or the same programme without
+  the presenters — with no gap and no restart. The engine opens the other
+  mount alongside the one playing, lines the two up to the sample by
+  cross-correlating their audio (the byte-depth estimate alone is only good
+  to a few tens of ms), and crossfades over half a second. If the other
+  mount cannot be reached, the one playing simply carries on.
 - **Resilient.** Automatic reconnection with backoff; a dropped network never
-  crashes the app.
+  crashes the app. Faults show as a few words on the dot-matrix display (or
+  a pilot lamp on the vintage face) with the full reason in a tooltip — never
+  as a line of error text on the fascia.
 - **Three faces.** Right-click → **Face** switches between the default rack
   unit, a **Vintage 80s** UK receiver — a backlit tuning dial with a real
   analogue feel, turn the knob through inter-station static until LTBR·FM
@@ -43,8 +52,9 @@ desktop counterpart, downloadable from the same page.
   strip about a quarter of the footprint that keeps playing while the chrome
   tucks away. The choice is remembered.
 
-Default stream: `https://stream.ltbr.fm/live` (any Icecast/SHOUTcast MP3 URL
-works — type one in the **Stream** box and press **Tune**).
+Streams: `https://stream.ltbr.fm/live` (with DJ) and
+`https://stream.ltbr.fm/live-nodj` (without) — the **NO DJ** key picks
+between them, and the choice is remembered.
 
 ## Architecture
 
@@ -55,6 +65,8 @@ Rust engine (background threads)
     ─▶ rubato resample → cpal output       (WASAPI / CoreAudio / ALSA)
        └▶ rustfft ─▶ 20 log bars ─▶ UI event
   state machine: standby │ tuning │ live │ error  ─▶ UI event
+  seamless switch: second deck ─▶ decode ahead ─▶ byte-depth estimate
+    ─▶ cross-correlate PCM (helper thread) ─▶ 0.5 s crossfade ─▶ "source" UI event
   ICY StreamTitle + StreamUrl ─▶ decode ─▶ held until the audio it
     describes reaches the speakers ─▶ "nowplaying" / "metadata" UI events
        └▶ lag vs. the live edge ─▶ trim or resync ─▶ "sync" UI event
@@ -88,7 +100,7 @@ Source map:
 | Volume | Horizontal fader (drag, arrows, double-click to reset) |
 | EQ band / preamp | Vertical faders (drag, arrows, double-click to 0 dB) |
 | Presets | Flat / Pirate / Bass / Voice chips |
-| Change station | Type a URL → **Tune** (or **Enter**) |
+| DJ on / off | **NO DJ** key, or **D** — the LED blinks while the other mount is brought in, then holds |
 
 ## Development
 

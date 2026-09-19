@@ -48,6 +48,13 @@
         <button class="key" id="btnMute" aria-pressed="false" title="Mute (M)" aria-label="Mute">
           <svg viewBox="0 0 24 24" id="icoVol"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 8.5c1.4 1 1.4 6 0 7" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
         </button>
+        <!-- Latching key: switches between the station's DJ and no-DJ mounts.
+             The LED shows what is on air, and blinks while the engine is
+             bringing the other mount in behind the one playing. -->
+        <button class="key key-text" id="btnNoDj" aria-pressed="false"
+                title="No DJ — music and idents only (D)" aria-label="No DJ">
+          <span class="key-led"></span>No DJ
+        </button>
       </div>
 
       <div class="vol">
@@ -72,16 +79,6 @@
       <div class="bands" id="bands"></div>
     </div>
 
-    <div class="source">
-      <label for="streamUrl">Stream</label>
-      <input id="streamUrl" type="url" spellcheck="false"
-             value="https://stream.ltbr.fm/live"
-             placeholder="https://…" />
-      <button class="tune" id="btnTune">Tune</button>
-    </div>
-
-    <div class="fault" id="fault" role="status" aria-live="polite"></div>
-
   </div>
 </div>
 
@@ -95,6 +92,14 @@
       <div class="vbrand">
         <span class="vname">LTBR<i>.</i>FM</span>
         <small>Wavemaster 3000 &nbsp;·&nbsp; Stereo FM Receiver &nbsp;·&nbsp; London</small>
+        <!-- Pilot lamps under the wordmark: TUNED glows while a carrier is
+             held; NO SIGNAL lights when the connection is lost (pulsing while
+             the set hunts for it again). The full reason sits in the tooltip
+             so the fascia itself never carries a line of error text. -->
+        <div class="vlamps" id="vLamps" role="status" aria-live="polite">
+          <span class="vlamp vlamp-tuned" id="vLampTuned"><i></i>Tuned</span>
+          <span class="vlamp vlamp-fault" id="vLampFault"><i></i>No Signal</span>
+        </div>
       </div>
       <div class="vmeters">
         <div class="vmeter"><canvas id="vVuL"></canvas></div>
@@ -116,6 +121,8 @@
                   title="Mute" aria-label="Mute">MUTE</button>
           <button class="vkey" id="vEq"
                   title="Graphic equaliser" aria-label="Show or hide the graphic equaliser">EQ</button>
+          <button class="vkey" id="vNoDj" aria-pressed="false"
+                  title="No DJ — music and idents only" aria-label="No DJ">NO DJ<span class="vdot"></span></button>
         </div>
         <span class="vlbl">Function</span>
       </div>

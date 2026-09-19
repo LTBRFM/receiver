@@ -204,6 +204,30 @@ impl BytePipe {
         self.data.notify_all();
         self.space.notify_all();
     }
+
+    /// True once the writer has gone away — EOF, error or stop.
+    pub fn is_closed(&self) -> bool {
+        self.state.lock().unwrap().closed
+    }
+
+    /// Bytes currently waiting in the pipe. Cheap; safe to poll every packet.
+    pub fn buffered(&self) -> usize {
+        self.state.lock().unwrap().buf.len()
+    }
+
+    /// The session write cursor: every audio byte the network has delivered.
+    /// On a burst-on-connect mount this is, to within network latency, the
+    /// station's live edge in this connection's byte coordinates.
+    pub fn written(&self) -> u64 {
+        self.state.lock().unwrap().written
+    }
+
+    /// Bytes between a decoder cursor and the live edge — [`Tick::depth_bytes`]
+    /// without releasing any metadata, for a read-only look.
+    pub fn depth(&self, demuxed: u64) -> u64 {
+        let guard = self.state.lock().unwrap();
+        guard.written.saturating_sub(guard.dropped + demuxed)
+    }
 }
 
 /// Offset of the next MPEG frame sync (11 set bits) at or after the start of
@@ -374,6 +398,50 @@ pub struct StationInfo {
     pub metaint: usize,
 }
 
+/// Why a connection failed, classified for the display. `code` is one of a
+/// small fixed set the frontend turns into a short indicator; `message` is the
+/// full story for a tooltip.
+///
+/// Codes: `connect` (unreachable host), `timeout`, `http` (non-2xx, e.g. a
+/// mount that is not up), `dropped` (a live connection broke), `network`
+/// (anything else on the wire).
+#[derive(Debug, Clone)]
+pub struct NetError {
+    pub code: &'static str,
+    pub message: String,
+}
+
+impl NetError {
+    fn from_reqwest(e: &reqwest::Error, host: &str) -> Self {
+        if e.is_timeout() {
+            NetError {
+                code: "timeout",
+                message: format!("Connection to {host} timed out"),
+            }
+        } else if e.is_connect() {
+            NetError {
+                code: "connect",
+                message: format!("Cannot reach {host}"),
+            }
+        } else {
+            NetError {
+                code: "network",
+                message: e.to_string(),
+            }
+        }
+    }
+}
+
+fn host_of(url: &str) -> String {
+    url.split("//")
+        .nth(1)
+        .unwrap_or(url)
+        .split('/')
+        .next()
+        .unwrap_or(url)
+        .to_string()
+}
+
 /// Connect and pump the stream into `pipe` until `stop`, EOF, or an error.
 /// `on_connect` fires once with the station headers. Metadata is stamped into
 /// the pipe rather than reported here, so that it surfaces in step with the
@@ -383,7 +451,7 @@ pub fn run<F>(
     stop: Arc<AtomicBool>,
     pipe: Arc<BytePipe>,
     on_connect: F,
-) -> io::Result<()>
+) -> Result<(), NetError>
 where
     F: FnOnce(StationInfo),
 {
@@ -392,10 +460,11 @@ where
     result
 }
 
-fn pump<F>(url: &str, stop: &AtomicBool, pipe: &BytePipe, on_connect: F) -> io::Result<()>
+fn pump<F>(url: &str, stop: &AtomicBool, pipe: &BytePipe, on_connect: F) -> Result<(), NetError>
 where
     F: FnOnce(StationInfo),
 {
+    let host = host_of(url);
     // No total timeout — this is an endless stream. TCP keepalive lets the OS
     // detect a dead peer and fail the blocking read instead of hanging forever.
     let client = reqwest::blocking::Client::builder()
@@ -403,16 +472,19 @@ where
         .tcp_keepalive(Duration::from_secs(15))
         .user_agent("LTBR-FM-Receiver/0.1")
         .build()
-        .map_err(to_io)?;
+        .map_err(|e| NetError::from_reqwest(&e, &host))?;
 
     let mut resp = client
         .get(url)
         .header("Icy-MetaData", "1")
         .send()
-        .map_err(to_io)?;
+        .map_err(|e| NetError::from_reqwest(&e, &host))?;
 
     if !resp.status().is_success() {
-        return Err(io::Error::other(format!("HTTP {}", resp.status())));
+        return Err(NetError {
+            code: "http",
+            message: format!("Stream returned HTTP {}", resp.status()),
+        });
     }
 
     // Read headers as lossy UTF-8, not `to_str()`: the station name is
@@ -445,13 +517,14 @@ where
             Ok(0) => return Ok(()), // stream ended
             Ok(n) => demux.feed(&buf[..n], pipe, stop),
             Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
-            Err(e) => return Err(e),
+            Err(e) => {
+                return Err(NetError {
+                    code: "dropped",
+                    message: format!("Connection lost ({e})"),
+                })
+            }
         }
     }
-}
-
-fn to_io(e: reqwest::Error) -> io::Error {
-    io::Error::other(e.to_string())
 }
 
 #[cfg(test)]
