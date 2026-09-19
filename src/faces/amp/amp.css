@@ -14,7 +14,9 @@
   --a-silver:#d7dbe3;
   --a-silver-hi:#f1f3f7;
   --a-silver-lo:#a9b0bd;
-  --a-edge:#6c7488;
+  /* every control is inked in dark navy — that outline is what holds the
+     skin together, silver fills inside it */
+  --a-edge:#22346b;
   --a-blue:#2f5bc4;
   --a-blue-deep:#173a9a;
   --a-lcd:#10307f;
@@ -26,11 +28,12 @@
   background:
     linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,0) 30%, rgba(0,0,0,0) 70%, rgba(0,0,0,.10)),
     var(--a-silver);
-  border:1px solid var(--a-edge);
-  border-radius:6px 6px 4px 4px;
+  border:2px solid var(--a-edge);
+  border-radius:14px;
   box-shadow:
     0 1px 0 var(--a-silver-hi) inset,
-    0 -1px 0 var(--a-silver-lo) inset,
+    0 0 0 1px rgba(255,255,255,.55) inset,
+    0 -2px 0 var(--a-silver-lo) inset,
     0 6px 18px rgba(0,0,0,.45);
   overflow:hidden;
   user-select:none;
@@ -40,51 +43,48 @@
 
 .atitle{
   display:flex; align-items:center; gap:8px;
-  height:22px; padding:0 6px 0 8px;
-  background:linear-gradient(180deg,#5f86e0 0%, var(--a-blue) 45%, var(--a-blue-deep) 100%);
-  border-bottom:1px solid #0f2a78;
-  box-shadow:0 1px 0 rgba(255,255,255,.35) inset;
+  height:24px; padding:0 8px 0 10px;
+  background:linear-gradient(180deg, var(--a-silver-hi), var(--a-silver) 60%, #c8cdd8);
 }
-/* the classic ridged grip either side of the name */
+/* the classic ridged grip either side of the name, inked navy */
 .agrip{
-  flex:1; height:8px;
+  flex:1; height:9px;
   background:repeating-linear-gradient(180deg,
-    rgba(255,255,255,.55) 0 1px, rgba(0,0,0,.35) 1px 2px, rgba(0,0,0,0) 2px 3px);
-  border-radius:1px;
+    var(--a-edge) 0 1px, rgba(255,255,255,.6) 1px 2px, rgba(0,0,0,0) 2px 3px);
 }
 .aname{
-  font-weight:900; font-size:10px; letter-spacing:.22em; text-transform:uppercase;
-  color:#fff; text-shadow:0 1px 0 rgba(0,0,0,.55);
-  padding:0 4px; white-space:nowrap;
+  font-weight:900; font-size:11px; letter-spacing:.2em; text-transform:uppercase;
+  color:var(--a-edge); text-shadow:0 1px 0 rgba(255,255,255,.7);
+  padding:0 6px; white-space:nowrap;
 }
-.aname i{ font-style:normal; color:#ffb347 }
+.aname i{ font-style:normal; color:#e28a1a }
 .aname.clickable{ cursor:pointer }
-.aname.clickable:hover{ color:#ffd9a3 }
-.aname.clickable:focus-visible{ outline:2px solid #fff; outline-offset:2px; border-radius:2px }
+.aname.clickable:hover{ color:var(--a-blue) }
+.aname.clickable:focus-visible{ outline:2px solid var(--a-blue); outline-offset:2px; border-radius:2px }
 
+/* window buttons: navy squares with white glyphs */
 button.atbtn{
-  width:14px; height:12px; padding:0; border:none; cursor:pointer;
+  width:13px; height:13px; padding:0; border:none; cursor:pointer;
   border-radius:2px;
-  background:linear-gradient(180deg,#f4f6fa,#c3c9d4);
-  box-shadow:0 0 0 1px #0f2a78, 0 1px 0 rgba(255,255,255,.5) inset;
-  color:#1c3a8f;
+  background:linear-gradient(180deg,#3d5296,var(--a-edge));
+  box-shadow:0 0 0 1px #121e45, 0 1px 0 rgba(255,255,255,.35) inset;
+  color:#fff;
   display:flex; align-items:center; justify-content:center;
 }
+button.atbtn + button.atbtn{ margin-left:-4px }
 button.atbtn svg{ width:8px; height:8px; fill:currentColor }
-button.atbtn:hover{ background:linear-gradient(180deg,#ffffff,#d5dae4) }
-button.atbtn:active{ background:linear-gradient(180deg,#b9c0cc,#d8dde6) }
-button.atbtn:focus-visible{ outline:2px solid #fff; outline-offset:1px }
+button.atbtn:hover{ background:linear-gradient(180deg,#4d64ad,#2a3f80) }
+button.atbtn:active{ background:linear-gradient(180deg,#1b2a5c,#2f4488) }
+button.atbtn:focus-visible{ outline:2px solid var(--a-blue); outline-offset:1px }
 
 /* ---------- menu bar ---------- */
 
 .amenu{
-  display:flex; gap:2px; height:20px; align-items:center; padding:0 6px;
-  border-bottom:1px solid var(--a-silver-lo);
-  box-shadow:0 1px 0 var(--a-silver-hi);
+  display:flex; gap:4px; height:22px; align-items:center; padding:0 8px;
 }
 button.amenu-item{
   background:none; border:none; cursor:pointer; font-family:inherit;
-  font-size:11px; color:#1d2436; padding:2px 8px; border-radius:2px;
+  font-size:12px; font-weight:500; color:#141a2c; padding:2px 8px; border-radius:3px;
 }
 button.amenu-item:hover{ background:var(--a-blue); color:#fff }
 button.amenu-item:focus-visible{ outline:2px solid var(--a-blue); outline-offset:-2px }
@@ -118,11 +118,11 @@ button.amenu-item:focus-visible{ outline:2px solid var(--a-blue); outline-offset
 /* right-hand column of small keys */
 .aside{ display:flex; flex-direction:column; gap:6px; align-items:stretch; width:64px }
 button.asmall{
-  height:18px; padding:0 6px; border:none; cursor:pointer;
-  border-radius:9px; font-family:inherit; font-size:8px; font-weight:900; letter-spacing:.12em;
-  color:#1c3a8f;
+  height:19px; padding:0 6px; border:none; cursor:pointer;
+  border-radius:10px; font-family:inherit; font-size:9px; font-weight:900; letter-spacing:.1em;
+  color:var(--a-edge);
   background:linear-gradient(180deg, var(--a-silver-hi), var(--a-silver) 55%, var(--a-silver-lo));
-  box-shadow:0 0 0 1px var(--a-edge), 0 1px 0 rgba(255,255,255,.7) inset, 0 1px 2px rgba(0,0,0,.25);
+  box-shadow:0 0 0 1.5px var(--a-edge), 0 1px 0 rgba(255,255,255,.7) inset, 0 1px 2px rgba(0,0,0,.25);
   display:flex; align-items:center; justify-content:center;
 }
 button.asmall svg{ width:10px; height:6px; fill:currentColor }
@@ -130,7 +130,7 @@ button.asmall:hover{ filter:brightness(1.05) }
 button.asmall:active,
 button.asmall[aria-pressed="true"]{
   background:linear-gradient(180deg, var(--a-silver-lo), var(--a-silver));
-  box-shadow:0 0 0 1px var(--a-edge), 0 1px 3px rgba(0,0,0,.35) inset;
+  box-shadow:0 0 0 1.5px var(--a-edge), 0 1px 3px rgba(0,0,0,.35) inset;
 }
 button.asmall:focus-visible{ outline:2px solid var(--a-blue); outline-offset:2px }
 .asidekey{ display:flex; align-items:center; gap:5px }
@@ -139,7 +139,7 @@ button.asmall:focus-visible{ outline:2px solid var(--a-blue); outline-offset:2px
 .aled{
   width:7px; height:7px; border-radius:50%; flex:none;
   background:radial-gradient(circle at 35% 30%, #4a5570, #1d2436);
-  box-shadow:0 0 0 1px var(--a-edge), 0 1px 0 rgba(255,255,255,.5);
+  box-shadow:0 0 0 1.5px var(--a-edge), 0 1px 0 rgba(255,255,255,.5);
 }
 .aled.lit{
   background:radial-gradient(circle at 35% 30%, #bfe0ff, var(--a-led) 60%, #1b4fb8);
@@ -157,10 +157,10 @@ button.asmall:focus-visible{ outline:2px solid var(--a-blue); outline-offset:2px
 .atransport{ display:flex; align-items:center; gap:8px; margin-top:10px }
 .aroundkeys{ display:flex; gap:4px }
 button.around{
-  width:28px; height:28px; border-radius:50%; border:none; cursor:pointer; padding:0;
-  color:#1c3a8f;
-  background:radial-gradient(circle at 50% 30%, #ffffff 0%, var(--a-silver) 45%, var(--a-silver-lo) 100%);
-  box-shadow:0 0 0 1px var(--a-edge), 0 2px 3px rgba(0,0,0,.35), 0 1px 0 rgba(255,255,255,.8) inset;
+  width:30px; height:30px; border-radius:50%; border:none; cursor:pointer; padding:0;
+  color:var(--a-edge);
+  background:radial-gradient(circle at 50% 30%, #ffffff 0%, var(--a-silver) 50%, var(--a-silver-lo) 100%);
+  box-shadow:0 0 0 2px var(--a-edge), 0 2px 3px rgba(0,0,0,.35), 0 1px 0 rgba(255,255,255,.8) inset;
   display:flex; align-items:center; justify-content:center;
   transition:transform .05s;
 }
@@ -171,51 +171,58 @@ button.around:active,
 button.around[aria-pressed="true"]{
   transform:translateY(1px);
   background:radial-gradient(circle at 50% 70%, #ffffff 0%, var(--a-silver-lo) 60%, #98a0ae 100%);
-  box-shadow:0 0 0 1px var(--a-edge), 0 1px 2px rgba(0,0,0,.35) inset;
+  box-shadow:0 0 0 2px var(--a-edge), 0 1px 2px rgba(0,0,0,.35) inset;
 }
 button.around:focus-visible{ outline:2px solid var(--a-blue); outline-offset:2px }
 
-/* mute: a small oval key after the transport, like the eject */
+/* mute + volume share a rounded tray, like the skin's level control */
+.avoltray{
+  flex:1; display:flex; align-items:center; gap:6px;
+  height:26px; padding:0 8px 0 4px; margin-left:6px;
+  border-radius:13px;
+  background:linear-gradient(180deg, var(--a-silver-hi), var(--a-silver) 60%, #c8cdd8);
+  box-shadow:0 0 0 1.5px var(--a-edge), 0 1px 0 rgba(255,255,255,.7) inset;
+}
 button.aeject{
-  width:30px; height:20px; border-radius:10px; border:none; cursor:pointer; padding:0;
-  margin-left:4px; color:#1c3a8f;
+  width:22px; height:18px; border-radius:9px; border:none; cursor:pointer; padding:0;
+  color:var(--a-edge);
   background:linear-gradient(180deg, var(--a-silver-hi), var(--a-silver) 55%, var(--a-silver-lo));
-  box-shadow:0 0 0 1px var(--a-edge), 0 1px 0 rgba(255,255,255,.7) inset, 0 1px 2px rgba(0,0,0,.25);
+  box-shadow:0 0 0 1.5px var(--a-edge), 0 1px 0 rgba(255,255,255,.7) inset;
   display:flex; align-items:center; justify-content:center;
 }
-button.aeject svg{ width:13px; height:13px; fill:currentColor }
+button.aeject svg{ width:12px; height:12px; fill:currentColor }
 button.aeject[aria-pressed="true"]{
   color:#8b1e12;
-  box-shadow:0 0 0 1px var(--a-edge), 0 1px 3px rgba(0,0,0,.35) inset;
+  box-shadow:0 0 0 1.5px var(--a-edge), 0 1px 3px rgba(0,0,0,.35) inset;
 }
 button.aeject:focus-visible{ outline:2px solid var(--a-blue); outline-offset:2px }
 
-/* volume: a short horizontal fader with a silver pill cap */
-.avol{ flex:1; display:flex; align-items:center; padding:0 6px }
-.fader-h.afader{ width:100%; height:16px }
+/* volume: a recessed navy groove with a silver pill cap */
+.avol{ flex:1; display:flex; align-items:center }
+.fader-h.afader{ width:100%; height:18px }
 .afader .slot{
-  top:6px; height:4px; border-radius:2px;
-  background:linear-gradient(180deg, #8e97a8, #c9cfda);
-  box-shadow:0 1px 0 rgba(255,255,255,.7), 0 1px 1px rgba(0,0,0,.35) inset;
+  top:7px; height:5px; border-radius:3px;
+  background:linear-gradient(180deg, #16224a, #2c3f7c);
+  box-shadow:0 1px 0 rgba(255,255,255,.6), 0 1px 1px rgba(0,0,0,.5) inset;
 }
 .afader .cap{
-  width:22px; height:14px; top:1px; margin-left:-11px; border-radius:7px;
+  width:26px; height:14px; top:2px; margin-left:-13px; border-radius:7px;
   background:linear-gradient(180deg, var(--a-silver-hi), var(--a-silver) 55%, var(--a-silver-lo));
-  box-shadow:0 0 0 1px var(--a-edge), 0 1px 0 rgba(255,255,255,.7) inset;
+  box-shadow:0 0 0 1.5px var(--a-edge), 0 1px 0 rgba(255,255,255,.7) inset;
 }
 .afader .cap::after{
   left:50%; margin-left:-1px; width:2px; top:3px; bottom:3px;
-  background:var(--a-blue); box-shadow:none; border-radius:1px;
+  background:var(--a-edge); box-shadow:none; border-radius:1px;
 }
 .afader:focus-visible{ outline:2px solid var(--a-blue) }
 
 /* EQ tab: the folded tab that opens the panel below */
 button.atab{
-  height:20px; padding:0 12px; border:none; cursor:pointer;
-  border-radius:8px 8px 0 0; font-family:inherit; font-size:9px; font-weight:900; letter-spacing:.2em;
-  color:#1c3a8f; align-self:flex-end; margin-bottom:-6px;
+  height:22px; padding:0 14px; border:none; cursor:pointer;
+  border-radius:9px 9px 0 0; font-family:inherit; font-size:9px; font-weight:900; letter-spacing:.2em;
+  color:var(--a-edge); align-self:flex-end; margin-bottom:-6px;
   background:linear-gradient(180deg, var(--a-silver-hi), var(--a-silver));
-  box-shadow:0 0 0 1px var(--a-edge);
+  box-shadow:0 0 0 1.5px var(--a-edge);
 }
 button.atab[aria-pressed="true"]{ background:linear-gradient(180deg,#c9d3ea,#b4c2e6); color:var(--a-blue-deep) }
 button.atab:focus-visible{ outline:2px solid var(--a-blue); outline-offset:1px }
@@ -231,24 +238,24 @@ button.abolt:focus-visible{ outline:2px solid var(--a-blue); outline-offset:2px;
 
 .aeqpanel{
   display:flex; gap:10px; align-items:stretch;
-  padding:10px 10px 8px;
-  border-top:1px solid var(--a-edge);
+  margin:2px 4px 4px; padding:10px 10px 8px;
+  border:2px solid var(--a-edge); border-radius:12px;
   background:
-    linear-gradient(180deg, rgba(255,255,255,.25), rgba(255,255,255,0) 25%),
-    #c6cee0;
+    linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,0) 25%),
+    #cfd5e3;
   box-shadow:0 1px 0 rgba(255,255,255,.6) inset;
 }
 .aeqpanel.hidden{ display:none }
 .aeqleft{ display:flex; flex-direction:column; gap:6px; width:72px; flex:none }
 .acurve{
-  display:block; width:72px; height:30px; border-radius:3px;
-  background:linear-gradient(180deg, #2b55c9 0%, var(--a-lcd) 22%, var(--a-lcd-lo) 100%);
-  box-shadow:0 1px 3px rgba(0,0,0,.5) inset, 0 0 0 1px #071648 inset;
+  display:block; width:72px; height:30px; border-radius:5px;
+  background:linear-gradient(180deg, #3157c8 0%, #2247ad 50%, #1a3a97 100%);
+  box-shadow:0 1px 3px rgba(0,0,0,.5) inset, 0 0 0 1.5px var(--a-edge);
 }
 .aeqscale{
   display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end;
-  padding:26px 0 24px; width:34px; flex:none;
-  font-family:"LTBR Mono",ui-monospace,monospace; font-size:8px; color:#41508a;
+  padding:4px 0 50px; width:36px; flex:none;
+  font-family:inherit; font-size:8px; font-weight:900; color:var(--a-edge);
 }
 
 /* the shared equaliser, docked and restyled */
@@ -263,40 +270,50 @@ body.face-amp .eq-head .title{ display:none }
 body.face-amp .presets{ margin-left:0; gap:2px; width:100% }
 /* presets as folder tabs along the panel's foot */
 body.face-amp button.chip{
-  flex:1; border-radius:0 0 6px 6px; border:1px solid var(--a-edge); border-top:none;
+  flex:1; border-radius:0 0 8px 8px; border:1.5px solid var(--a-edge); border-top:none;
   background:linear-gradient(180deg, #c9d3ea, var(--a-silver));
-  color:#1c3a8f; font-weight:900; font-size:8px; letter-spacing:.18em; padding:4px 0;
+  color:var(--a-edge); font-weight:900; font-size:9px; letter-spacing:.14em; padding:4px 0;
   box-shadow:0 1px 0 rgba(255,255,255,.6) inset;
 }
-body.face-amp button.chip:hover{ color:var(--a-blue-deep); background:linear-gradient(180deg,#dbe3f5,#c9d3ea) }
-body.face-amp .bands{ gap:4px; align-items:flex-end }
-body.face-amp .band{ gap:3px }
-body.face-amp .band .db{ color:#41508a; font-size:8px; min-height:10px }
-body.face-amp .band.active .db{ color:var(--a-blue-deep) }
-body.face-amp .band .hz{ color:#41508a; font-size:8px }
-body.face-amp .band.pre .hz{ color:#1c3a8f }
-body.face-amp .rule{ background:var(--a-edge); box-shadow:1px 0 0 rgba(255,255,255,.6); margin:0 3px }
+body.face-amp button.chip:hover{ color:var(--a-blue); background:linear-gradient(180deg,#dbe3f5,#c9d3ea) }
+body.face-amp .bands{ gap:0; align-items:flex-end }
+body.face-amp .band{ gap:4px }
+/* the skin shows no numeric readout above the sliders — the cap position
+   is the value (still announced via aria-valuetext) */
+body.face-amp .band .db{ display:none }
+/* frequency legend: white on a navy strip, one cell per band */
+body.face-amp .band .hz{
+  width:100%; text-align:center; padding:3px 0 2px;
+  font-family:inherit; font-size:8px; font-weight:900; letter-spacing:.02em;
+  color:#fff; background:var(--a-edge);
+  box-shadow:1px 0 0 rgba(255,255,255,.35) inset;
+}
+body.face-amp .band:first-child .hz{ border-radius:4px 0 0 4px }
+body.face-amp .band:last-child .hz{ border-radius:0 4px 4px 0 }
+body.face-amp .band.pre .hz{ color:#fff; border-radius:4px }
+body.face-amp .rule{ display:none }
+body.face-amp .band.pre{ margin-right:8px }
 body.face-amp .fader-v{ width:22px; height:88px }
 body.face-amp .fader-v .slot{
-  left:9px; width:4px; border-radius:2px;
-  background:linear-gradient(90deg, #8e97a8, #c9cfda);
-  box-shadow:1px 0 0 rgba(255,255,255,.7), 0 1px 1px rgba(0,0,0,.35) inset;
+  left:9px; width:5px; border-radius:3px;
+  background:linear-gradient(90deg, #16224a, #2c3f7c);
+  box-shadow:1px 0 0 rgba(255,255,255,.5), 0 1px 1px rgba(0,0,0,.5) inset;
 }
 body.face-amp .fader-v .cap{
-  width:18px; height:11px; left:2px; margin-top:-5.5px; border-radius:5px;
+  width:18px; height:12px; left:2px; margin-top:-6px; border-radius:6px;
   background:linear-gradient(180deg, var(--a-silver-hi), var(--a-silver) 55%, var(--a-silver-lo));
-  box-shadow:0 0 0 1px var(--a-edge), 0 1px 0 rgba(255,255,255,.7) inset;
+  box-shadow:0 0 0 1.5px var(--a-edge), 0 1px 0 rgba(255,255,255,.7) inset;
 }
 body.face-amp .fader-v .cap::after{
   top:50%; margin-top:-1px; height:2px; left:4px; right:4px;
-  background:var(--a-blue); box-shadow:none; border-radius:1px;
+  background:var(--a-edge); box-shadow:none; border-radius:1px;
 }
 body.face-amp .fader-v:focus-visible{ outline:2px solid var(--a-blue) }
 
 /* ---------- shade mode (mini) ---------- */
 
 .ashade{ display:none }
-body.mini.face-amp .aunit{ width:400px; border-radius:6px }
+body.mini.face-amp .aunit{ width:400px }
 body.mini.face-amp .amenu,
 body.mini.face-amp .amain,
 body.mini.face-amp .aeqpanel{ display:none }
@@ -305,20 +322,19 @@ body.mini.face-amp .ashade{
   display:flex; align-items:center; gap:4px; padding:3px 6px 4px;
 }
 .ashade-lcd{
-  flex:1; min-width:0; padding:2px; border-radius:3px;
-  background:linear-gradient(180deg, var(--a-silver-lo), var(--a-silver-hi));
-  box-shadow:0 0 0 1px var(--a-edge) inset;
+  flex:1; min-width:0; padding:3px; border-radius:7px;
+  background:linear-gradient(180deg, #2b3d78, #101c45);
+  box-shadow:0 0 0 1px #0b1436 inset;
 }
 .ashade-lcd canvas{
-  display:block; width:100%; height:14px; border-radius:2px;
-  background:linear-gradient(180deg, #2b55c9 0%, var(--a-lcd) 30%, var(--a-lcd-lo) 100%);
-  box-shadow:0 1px 2px rgba(0,0,0,.5) inset;
+  display:block; width:100%; height:14px; border-radius:4px;
+  background:#2247ad;
 }
 button.ashade-btn{
-  width:18px; height:16px; border:none; cursor:pointer; padding:0; border-radius:3px;
-  color:#1c3a8f;
+  width:20px; height:18px; border:none; cursor:pointer; padding:0; border-radius:9px;
+  color:var(--a-edge);
   background:linear-gradient(180deg, var(--a-silver-hi), var(--a-silver-lo));
-  box-shadow:0 0 0 1px var(--a-edge), 0 1px 0 rgba(255,255,255,.7) inset;
+  box-shadow:0 0 0 1.5px var(--a-edge), 0 1px 0 rgba(255,255,255,.7) inset;
   display:flex; align-items:center; justify-content:center;
 }
 button.ashade-btn svg{ width:8px; height:8px; fill:currentColor }

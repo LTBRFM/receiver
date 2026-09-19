@@ -67,6 +67,48 @@ function badge(c: CanvasRenderingContext2D, s: string, x: number, y: number, lit
   return w;
 }
 
+// ---- LCD digits ---------------------------------------------------------------
+//
+// The time is set in seven-segment digits rather than the dot font: 9x13
+// cells with 2-cell strokes and open corners, which is what gives the skin's
+// clock its rounded LCD look. Drawn at a scale, like the text.
+
+const SEG_W = 9; // cells; 13 tall
+// a b c d e f g → top, top-right, bottom-right, bottom, bottom-left, top-left, middle
+const SEGS: Record<string, string> = {
+  "0": "abcdef", "1": "bc", "2": "abged", "3": "abgcd", "4": "fgbc",
+  "5": "afgcd", "6": "afgedc", "7": "abc", "8": "abcdefg", "9": "abcdfg", "-": "g",
+};
+
+function digit(c: CanvasRenderingContext2D, ch: string, x: number, y: number, k: number) {
+  const on = SEGS[ch] ?? "";
+  const r = (cx: number, cy: number, w: number, h: number) => c.fillRect(x + cx * k, y + cy * k, w * k, h * k);
+  if (on.includes("a")) r(1, 0, 7, 2);
+  if (on.includes("b")) r(7, 1, 2, 5);
+  if (on.includes("c")) r(7, 7, 2, 5);
+  if (on.includes("d")) r(1, 11, 7, 2);
+  if (on.includes("e")) r(0, 7, 2, 5);
+  if (on.includes("f")) r(0, 1, 2, 5);
+  if (on.includes("g")) r(1, 5.5, 7, 2);
+}
+
+/** "m:ss" in segment digits; returns the width drawn. */
+function clock(c: CanvasRenderingContext2D, s: string, x: number, y: number, k: number, color: string): number {
+  c.fillStyle = color;
+  let cx = x;
+  for (const ch of s) {
+    if (ch === ":") {
+      c.fillRect(cx + 1 * k, y + 3.5 * k, 2 * k, 2 * k);
+      c.fillRect(cx + 1 * k, y + 8 * k, 2 * k, 2 * k);
+      cx += 5 * k;
+    } else {
+      digit(c, ch, cx, y, k);
+      cx += (SEG_W + 2) * k;
+    }
+  }
+  return cx - x;
+}
+
 // ---- canvases -----------------------------------------------------------------
 
 interface Lcd {
@@ -277,20 +319,20 @@ function drawMain(dt: number) {
   drawGlass(c, w, h);
 
   // -- play-state glyph, then the time, big
-  const top = 12;
+  const top = 11;
   c.fillStyle = INK;
   if (live) {
-    c.beginPath(); c.moveTo(PAD, top + 6); c.lineTo(PAD, top + 16); c.lineTo(PAD + 6, top + 11); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(PAD, top + 8); c.lineTo(PAD, top + 18); c.lineTo(PAD + 6, top + 13); c.closePath(); c.fill();
   } else if (state === "tuning") {
-    if (blink) { c.fillRect(PAD - 1, top + 6, 3, 10); c.fillRect(PAD + 3, top + 6, 3, 10); }
+    if (blink) { c.fillRect(PAD - 1, top + 8, 3, 10); c.fillRect(PAD + 3, top + 8, 3, 10); }
   } else {
-    c.fillRect(PAD, top + 7, 7, 7);
+    c.fillRect(PAD, top + 9, 7, 7);
   }
   const t = live
     ? (() => { const e = elapsedMs(); return e === null ? "0:00" : fmtTime(e); })()
     : state === "tuning" ? (blink ? "-:--" : "    ") : "0:00";
   const timeX = PAD + 12;
-  const timeW = text(c, t.padStart(5, " "), timeX, top, 3, INK);
+  const timeW = clock(c, t.padStart(4, " "), timeX, top - 1, 2, INK);
 
   // -- readouts, two rows packed beside the time
   const kbps = player.getBitrateKbps() || player.getStation()?.bitrateKbps || 0;
