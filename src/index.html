@@ -175,7 +175,7 @@
 
   <div class="amain">
     <div class="arow">
-      <div class="alcd"><canvas id="aDisplay" height="104"></canvas></div>
+      <div class="alcd"><canvas id="aDisplay" height="84"></canvas></div>
       <div class="aside">
         <button class="asmall" id="aSideMenu" title="Window options" aria-label="Window options">
           <svg viewBox="0 0 10 6"><path d="M1 1h8L5 5z"/></svg>
@@ -191,27 +191,13 @@
       </div>
     </div>
 
-    <!-- Track position, from the station timeline. Read-only: it is radio. -->
-    <div class="aseek" id="aSeek" title="Track position">
-      <div class="aseek-track"></div><div class="aseek-knob" id="aSeekKnob"></div>
-    </div>
-
     <div class="atransport">
       <div class="aroundkeys">
-        <button class="around" id="aPrev" title="Previous EQ preset" aria-label="Previous EQ preset">
-          <svg viewBox="0 0 16 16"><path d="M3 3h2v10H3zM13 3v10L6 8z"/></svg>
-        </button>
         <button class="around aplay" id="aPlay" title="Play (Space)" aria-label="Play">
           <svg viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z"/></svg>
         </button>
-        <button class="around" id="aPause" title="Pause (Space)" aria-label="Pause">
-          <svg viewBox="0 0 16 16"><path d="M3 3h4v10H3zM9 3h4v10H9z"/></svg>
-        </button>
         <button class="around" id="aStop" title="Stop" aria-label="Stop">
           <svg viewBox="0 0 16 16"><path d="M3 3h10v10H3z"/></svg>
-        </button>
-        <button class="around" id="aNext" title="Next EQ preset" aria-label="Next EQ preset">
-          <svg viewBox="0 0 16 16"><path d="M11 3h2v10h-2zM3 3v10l7-5z"/></svg>
         </button>
       </div>
       <button class="aeject" id="aMute" aria-pressed="false" title="Mute (M)" aria-label="Mute">
@@ -247,7 +233,6 @@
   <div class="ashade">
     <div class="ashade-lcd"><canvas id="aShadeDisplay" height="14"></canvas></div>
     <button class="ashade-btn" id="aShadePlay" title="Play" aria-label="Play"><svg viewBox="0 0 8 8"><path d="M2 1l5 3-5 3z"/></svg></button>
-    <button class="ashade-btn" id="aShadePause" title="Pause" aria-label="Pause"><svg viewBox="0 0 8 8"><path d="M1.5 1h2v6h-2zM4.5 1h2v6h-2z"/></svg></button>
     <button class="ashade-btn" id="aShadeStop" title="Stop" aria-label="Stop"><svg viewBox="0 0 8 8"><path d="M1.5 1.5h5v5h-5z"/></svg></button>
     <button class="ashade-btn" id="aShadeExpand" title="Full player" aria-label="Full player"><svg viewBox="0 0 8 8"><path d="M1 6h6V5H1zM2 4h4V3H2zM3 2h2V1H3z"/></svg></button>
   </div>

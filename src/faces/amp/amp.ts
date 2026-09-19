@@ -7,11 +7,10 @@
 // the same 5x7 dot font the rack face uses, drawn as solid cells. The words
 // come from display.ts; this file only decides how they look.
 //
-// Functionality maps onto the skin's furniture: ⏮ ⏭ step through EQ presets
-// (it is radio — there are no tracks to skip), the eject-shaped key mutes,
-// the position bar shows where the current track is on the station timeline,
-// the side keys are NO DJ and always-on-top, the EQ panel's ON key bypasses
-// the equaliser, and the title-bar "shade" key folds the player into a bar.
+// Functionality maps onto the skin's furniture, pared down to what radio
+// needs: play and stop, the eject-shaped key mutes, a volume slider, the
+// side keys are NO DJ and always-on-top, the EQ panel's ON key bypasses the
+// equaliser, and the title-bar "shade" key folds the player into a bar.
 // ---------------------------------------------------------------------------
 
 import * as player from "../../player.ts";
@@ -24,13 +23,15 @@ import * as display from "../../display.ts";
 
 // ---- palette ----------------------------------------------------------------
 
-const INK = "#cfe0ff";
-const INK_DIM = "#4d74cf";
-const BADGE = "#b9d0ff";
-const BADGE_INK = "#0b1f66";
-const BADGE_DIM = "#1f3f9a";
-const BADGE_DIM_INK = "#6f8fdc";
-const PEAK = "#ffffff";
+// Soft, low-contrast ink on a mid blue — the classic look is a lit LCD,
+// not white-on-navy.
+const INK = "#d6e2ff";
+const INK_DIM = "#7b97dd";
+const BADGE = "#c5d6ff";
+const BADGE_INK = "#1a3890";
+const BADGE_DIM = "#2c4fb0";
+const BADGE_DIM_INK = "#8aa6ea";
+const PEAK = "#f2f6ff";
 
 const BARS = 20;
 
@@ -155,15 +156,15 @@ function titleLine(): string {
 
 // ---- main display ----------------------------------------------------------------
 //
-// Laid out as the classic skin: readouts across the top (time, kbps / kHz,
-// STEREO and NO DJ) with the analyser on the right, and the title on its own
-// darker band along the foot. The glass is painted here too — a domed sheen
-// across the top and a soft vignette — rather than left to CSS, so the
-// highlights curve with the corners.
+// Laid out as the classic skin, tight: the time big on the left, kbps / kHz
+// and the STEREO / NO DJ badges packed beside it, the analyser filling the
+// top-right, and the title scrolling on a slightly darker strip along the
+// foot. The glass is painted here — a mid blue with a soft domed sheen —
+// so the highlights follow the rounded corners.
 
-const RADIUS = 5;
-const PAD = 10;
-const BAND_H = 34; // the title band along the foot
+const RADIUS = 9;
+const PAD = 8;
+const BAND_H = 30; // the title strip along the foot
 
 function roundedRect(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   c.beginPath();
@@ -172,86 +173,89 @@ function roundedRect(c: CanvasRenderingContext2D, x: number, y: number, w: numbe
 }
 
 function drawGlass(c: CanvasRenderingContext2D, w: number, h: number) {
-  // body: royal blue fading to navy
+  // body: lit mid blue, a touch lighter towards the top
   const g = c.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, "#2d5ad1");
-  g.addColorStop(0.35, "#153a9c");
-  g.addColorStop(1, "#0a1d5e");
+  g.addColorStop(0, "#3157c8");
+  g.addColorStop(0.5, "#2247ad");
+  g.addColorStop(1, "#1a3a97");
   c.fillStyle = g;
   c.fillRect(0, 0, w, h);
 
-  // title band along the foot: darker, with a lit lower lip
-  c.fillStyle = "rgba(3,12,48,.42)";
+  // title strip: a shade darker, separated by a fine dark rule
+  c.fillStyle = "rgba(5,16,60,.22)";
   c.fillRect(0, h - BAND_H, w, BAND_H);
-  c.fillStyle = "rgba(0,0,0,.35)";
+  c.fillStyle = "rgba(5,16,60,.45)";
   c.fillRect(0, h - BAND_H, w, 1);
-  c.fillStyle = "rgba(160,190,255,.16)";
-  c.fillRect(0, h - BAND_H + 1, w, 1);
 
-  // domed sheen: a wide ellipse of light whose curved lower edge shows
+  // domed sheen across the top, its curved lower edge just visible
   c.save();
   c.beginPath();
-  c.ellipse(w * 0.42, -h * 0.55, w * 0.72, h * 0.95, 0, 0, Math.PI * 2);
+  c.ellipse(w * 0.45, -h * 0.62, w * 0.78, h * 1.02, 0, 0, Math.PI * 2);
   c.clip();
-  const sheen = c.createLinearGradient(0, 0, 0, h * 0.42);
-  sheen.addColorStop(0, "rgba(255,255,255,.26)");
-  sheen.addColorStop(1, "rgba(255,255,255,.06)");
+  const sheen = c.createLinearGradient(0, 0, 0, h * 0.4);
+  sheen.addColorStop(0, "rgba(255,255,255,.16)");
+  sheen.addColorStop(1, "rgba(255,255,255,.03)");
   c.fillStyle = sheen;
-  c.fillRect(0, 0, w, h * 0.42);
+  c.fillRect(0, 0, w, h * 0.4);
   c.restore();
 
-  // specular kiss at the top-left corner
-  const spec = c.createRadialGradient(w * 0.12, 2, 2, w * 0.12, 2, w * 0.22);
-  spec.addColorStop(0, "rgba(255,255,255,.20)");
-  spec.addColorStop(1, "rgba(255,255,255,0)");
-  c.fillStyle = spec;
-  c.fillRect(0, 0, w * 0.4, h * 0.5);
-
-  // vignette into the bezel
-  const vig = c.createRadialGradient(w / 2, h * 0.6, w * 0.25, w / 2, h * 0.6, w * 0.75);
+  // soft darkening into the surround
+  const vig = c.createRadialGradient(w / 2, h * 0.55, w * 0.3, w / 2, h * 0.55, w * 0.8);
   vig.addColorStop(0, "rgba(0,0,0,0)");
-  vig.addColorStop(1, "rgba(0,0,0,.28)");
+  vig.addColorStop(1, "rgba(0,0,0,.18)");
   c.fillStyle = vig;
   c.fillRect(0, 0, w, h);
 
-  // inner shadow along the top edge, where the glass sits under the bezel
-  const lip = c.createLinearGradient(0, 0, 0, 6);
-  lip.addColorStop(0, "rgba(0,0,0,.45)");
+  // inner shadow along the top edge
+  const lip = c.createLinearGradient(0, 0, 0, 5);
+  lip.addColorStop(0, "rgba(0,0,0,.35)");
   lip.addColorStop(1, "rgba(0,0,0,0)");
   c.fillStyle = lip;
-  c.fillRect(0, 0, w, 6);
+  c.fillRect(0, 0, w, 5);
 }
 
+/** Thin bars across the whole width, interpolated from the engine's twenty
+ *  bands, over the classic dotted grid — a fine texture rather than a row of
+ *  blocks. */
 function drawAnalyser(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
-  // recessed window with the classic dotted backdrop
-  c.fillStyle = "rgba(3,12,48,.45)";
+  // recessed window
+  c.fillStyle = "rgba(5,16,60,.30)";
   roundedRect(c, x - 3, y - 3, w + 6, h + 6, 3);
   c.fill();
-  c.fillStyle = "rgba(130,165,255,.18)";
+  // dotted grid: a dot every 3px, every other row
+  c.fillStyle = "rgba(170,195,255,.20)";
   for (let gy = y + h - 1; gy > y; gy -= 4) {
-    for (let gx = x + 1; gx < x + w; gx += 4) c.fillRect(gx, gy, 1, 1);
+    for (let gx = x; gx < x + w; gx += 3) c.fillRect(gx, gy, 1, 1);
   }
 
-  const gap = 2;
-  const barW = Math.floor((w - gap * (BARS - 1)) / BARS);
-  const span = barW * BARS + gap * (BARS - 1);
+  const barW = 2, gap = 1;
+  const n = Math.max(1, Math.floor((w + gap) / (barW + gap)));
+  const span = n * (barW + gap) - gap;
   const x0 = x + Math.floor((w - span) / 2);
-  const grad = c.createLinearGradient(0, y + h, 0, y);
-  grad.addColorStop(0, "#3f74e6");
-  grad.addColorStop(0.55, "#8db6ff");
-  grad.addColorStop(1, "#eaf2ff");
+  // smooth the twenty bands per frame, then spread them across n bars
   for (let i = 0; i < BARS; i++) {
     const v = Math.min(1, targets[i] * (1 + (i / BARS) * 0.35) * 0.85);
     levels[i] += (v - levels[i]) * (v > levels[i] ? 0.6 : 0.14);
     peaks[i] = Math.max(peaks[i] - 0.012, levels[i]);
-    const bx = x0 + i * (barW + gap);
-    // quantised to 2px steps, like a segmented meter
-    const hgt = Math.floor((levels[i] * h) / 2) * 2;
+  }
+  const at = (arr: Float32Array, t: number) => {
+    const p = t * (BARS - 1);
+    const i = Math.min(BARS - 2, Math.floor(p));
+    return arr[i] + (arr[i + 1] - arr[i]) * (p - i);
+  };
+  const grad = c.createLinearGradient(0, y + h, 0, y);
+  grad.addColorStop(0, "#6f9cf5");
+  grad.addColorStop(0.6, "#b8cfff");
+  grad.addColorStop(1, "#eef3ff");
+  for (let k = 0; k < n; k++) {
+    const t = n > 1 ? k / (n - 1) : 0;
+    const bx = x0 + k * (barW + gap);
+    const hgt = Math.floor(at(levels, t) * h);
     if (hgt > 0) {
       c.fillStyle = grad;
       c.fillRect(bx, y + h - hgt, barW, hgt);
     }
-    const ph = Math.floor((peaks[i] * h) / 2) * 2;
+    const ph = Math.floor(at(peaks, t) * h);
     if (ph > 1) {
       c.fillStyle = PEAK;
       c.fillRect(bx, y + h - ph - 1, barW, 1);
@@ -273,42 +277,42 @@ function drawMain(dt: number) {
   drawGlass(c, w, h);
 
   // -- play-state glyph, then the time, big
-  const top = 14;
+  const top = 12;
   c.fillStyle = INK;
   if (live) {
-    c.beginPath(); c.moveTo(PAD, top + 6); c.lineTo(PAD, top + 16); c.lineTo(PAD + 7, top + 11); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(PAD, top + 6); c.lineTo(PAD, top + 16); c.lineTo(PAD + 6, top + 11); c.closePath(); c.fill();
   } else if (state === "tuning") {
-    if (blink) { c.fillRect(PAD - 1, top + 6, 3, 10); c.fillRect(PAD + 4, top + 6, 3, 10); }
+    if (blink) { c.fillRect(PAD - 1, top + 6, 3, 10); c.fillRect(PAD + 3, top + 6, 3, 10); }
   } else {
-    c.fillRect(PAD, top + 7, 8, 8);
+    c.fillRect(PAD, top + 7, 7, 7);
   }
   const t = live
     ? (() => { const e = elapsedMs(); return e === null ? "0:00" : fmtTime(e); })()
     : state === "tuning" ? (blink ? "-:--" : "    ") : "0:00";
-  const timeX = PAD + 16;
+  const timeX = PAD + 12;
   const timeW = text(c, t.padStart(5, " "), timeX, top, 3, INK);
 
-  // -- readouts, two evenly spaced rows after the time
+  // -- readouts, two rows packed beside the time
   const kbps = player.getBitrateKbps() || player.getStation()?.bitrateKbps || 0;
   const khz = Math.round(player.getSampleRate() / 1000);
-  const rx = timeX + timeW + 20;
+  const rx = timeX + timeW + 10;
   let x = rx;
-  x += text(c, "KBPS", x, top + 2, 1, live ? INK : INK_DIM) + 5;
-  x += badge(c, live && kbps ? String(kbps) : "---", x, top, live, 28) + 12;
-  x += text(c, "KHZ", x, top + 2, 1, live ? INK : INK_DIM) + 5;
-  x += badge(c, live && khz ? String(khz) : "--", x, top, live, 24);
+  x += text(c, "KBPS", x, top + 2, 1, live ? INK : INK_DIM) + 4;
+  x += badge(c, live && kbps ? String(kbps) : "---", x, top, live, 26) + 8;
+  x += text(c, "-KHZ", x, top + 2, 1, live ? INK : INK_DIM) + 4;
+  x += badge(c, live && khz ? String(khz) : "--", x, top, live, 22);
   const readoutsEnd = x;
 
   x = rx;
-  x += badge(c, "STEREO", x, top + 22, live) + 8;
+  x += badge(c, "STEREO", x, top + 16, live) + 6;
   // NO DJ blinks while the other mount is being brought in.
-  badge(c, "NO DJ", x, top + 22, player.isSwitching() ? blink : player.getNoDj());
+  badge(c, "NO DJ", x, top + 16, player.isSwitching() ? blink : player.getNoDj());
 
   // -- analyser: everything to the right of the readouts
-  const specX = readoutsEnd + 22;
-  drawAnalyser(c, specX, top - 2, w - PAD - specX, 40);
+  const specX = readoutsEnd + 16;
+  drawAnalyser(c, specX, top - 3, w - PAD - specX, 32);
 
-  // -- title band: scrolling when it does not fit
+  // -- title strip: scrolling when it does not fit
   const line = titleLine().toUpperCase();
   if (line !== scrollText) {
     scrollText = line;
@@ -333,13 +337,6 @@ function drawMain(dt: number) {
     text(c, loop, PAD - off + lw, ty, scale, INK);
   }
   c.restore();
-
-  // -- a last curved glint over everything, faint enough to read through
-  const glint = c.createLinearGradient(0, 0, 0, h * 0.3);
-  glint.addColorStop(0, "rgba(255,255,255,.07)");
-  glint.addColorStop(1, "rgba(255,255,255,0)");
-  c.fillStyle = glint;
-  c.fillRect(0, 0, w, h * 0.3);
   c.restore();
 }
 
@@ -414,21 +411,6 @@ function drawCurve() {
   c.stroke();
 }
 
-// ---- position bar -------------------------------------------------------------------
-
-function updateSeek() {
-  const knob = document.getElementById("aSeekKnob")!;
-  const track = document.getElementById("aSeek")!;
-  const meta = player.getMetadata();
-  const now = player.timelineMs();
-  let t = 0;
-  if (player.getState() === "live" && meta?.now && now !== null && meta.now.durationMs > 0) {
-    t = Math.max(0, Math.min(1, (now - meta.now.startMs) / meta.now.durationMs));
-  }
-  knob.style.left = `calc(14px + ${(t * 100).toFixed(2)}% - ${(t * 28).toFixed(1)}px)`;
-  track.title = meta?.now && t > 0 ? `Track position ${Math.round(t * 100)}%` : "Track position";
-}
-
 // ---- frame loop ------------------------------------------------------------------------
 
 function frame(t: number) {
@@ -467,7 +449,6 @@ function activate() {
   volFader.set(player.getUserVolume() * 100);
   syncTransport();
   syncEqPanel();
-  updateSeek();
   drawCurve();
   last = 0;
   if (!raf) raf = requestAnimationFrame(frame);
@@ -484,7 +465,6 @@ function deactivate() {
 function syncTransport() {
   const s = player.getState();
   document.getElementById("aPlay")!.setAttribute("aria-pressed", String(s === "live" || s === "tuning"));
-  document.getElementById("aPause")!.setAttribute("aria-pressed", "false");
   document.getElementById("aStop")!.setAttribute("aria-pressed", String(s === "standby"));
   document.getElementById("aMute")!.setAttribute("aria-pressed", String(player.getMuted()));
 }
@@ -530,17 +510,9 @@ export function initAmp() {
   const play = () => { if (player.getState() !== "live" && player.getState() !== "tuning") player.play(); };
   $("aPlay").addEventListener("click", play);
   $("aShadePlay").addEventListener("click", play);
-  $("aPause").addEventListener("click", () => player.pause());
-  $("aShadePause").addEventListener("click", () => player.pause());
   $("aStop").addEventListener("click", () => player.stop());
   $("aShadeStop").addEventListener("click", () => player.stop());
   $("aMute").addEventListener("click", () => player.setMuted(!player.getMuted()));
-  const step = (dir: 1 | -1) => {
-    const name = eq.stepPreset(dir);
-    display.flash("EQ · " + name.toUpperCase());
-  };
-  $("aPrev").addEventListener("click", () => step(-1));
-  $("aNext").addEventListener("click", () => step(1));
 
   volFader = makeFader($("aVol"), {
     min: 0, max: 100, value: player.getUserVolume() * 100, vertical: false,
@@ -592,16 +564,13 @@ export function initAmp() {
     if (s === "standby" || s === "error") playStartedAt = 0;
     if (s !== "live") targets.fill(0);
     syncTransport();
-    updateSeek();
   });
   player.onMuteChange(syncTransport);
-  player.onMetadata(updateSeek);
-  setInterval(() => { if (active) updateSeek(); }, 1000);
 
   // -- fascia doubles as the drag handle (see DRAG_REGIONS in main.ts)
   for (const sel of [
     "#faceAmp", ".atitle", ".agrip", ".aname", ".amain", ".arow", ".alcd", "#aDisplay",
-    ".aside", ".aseek", ".aseek-track", ".aseek-knob", ".atransport", ".aroundkeys",
+    ".aside", ".atransport", ".aroundkeys",
     ".aeqpanel", ".aeqleft", ".aeqscale", ".aeqscale span", "#aCurve", ".ashade",
     ".ashade-lcd", "#aShadeDisplay", ".amenu",
   ]) {
