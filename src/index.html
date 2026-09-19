@@ -181,7 +181,7 @@
           <svg viewBox="0 0 10 6"><path d="M1 1h8L5 5z"/></svg>
         </button>
         <div class="asidekey">
-          <button class="asmall apill" id="aNoDj" aria-pressed="false" title="No DJ — music and idents only (D)" aria-label="No DJ">DJ</button>
+          <button class="asmall apill" id="aNoDj" aria-pressed="false" title="No DJ — music and idents only (D)" aria-label="No DJ">NO DJ</button>
           <span class="aled" id="aNoDjLed"></span>
         </div>
         <div class="asidekey">
@@ -192,13 +192,15 @@
     </div>
 
     <div class="atransport">
+      <!-- Each round key sits in a socket: the navy ring is the socket's,
+           so it stays put while the cap inside presses down. -->
       <div class="aroundkeys">
-        <button class="around aplay" id="aPlay" title="Play (Space)" aria-label="Play">
+        <span class="asocket"><button class="around aplay" id="aPlay" title="Play (Space)" aria-label="Play">
           <svg viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z"/></svg>
-        </button>
-        <button class="around" id="aStop" title="Stop" aria-label="Stop">
+        </button></span>
+        <span class="asocket"><button class="around" id="aStop" title="Stop" aria-label="Stop">
           <svg viewBox="0 0 16 16"><path d="M3 3h10v10H3z"/></svg>
-        </button>
+        </button></span>
       </div>
       <div class="avoltray">
         <button class="aeject" id="aMute" aria-pressed="false" title="Mute (M)" aria-label="Mute">

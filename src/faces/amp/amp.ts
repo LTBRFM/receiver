@@ -25,8 +25,8 @@ import * as display from "../../display.ts";
 
 // Soft, low-contrast ink on a mid blue — the classic look is a lit LCD,
 // not white-on-navy.
-const INK = "#d6e2ff";
-const INK_DIM = "#7b97dd";
+const INK = "#aabdf0";
+const INK_DIM = "#6b88d2";
 const BADGE = "#c5d6ff";
 const BADGE_INK = "#1a3890";
 const BADGE_DIM = "#2c4fb0";
@@ -73,40 +73,47 @@ function badge(c: CanvasRenderingContext2D, s: string, x: number, y: number, lit
 // cells with 2-cell strokes and open corners, which is what gives the skin's
 // clock its rounded LCD look. Drawn at a scale, like the text.
 
-const SEG_W = 9; // cells; 13 tall
+// Digit box and stroke in px. Slots are fixed — the clock always lays out
+// "88:88" — so nothing beside it shifts as the minutes grow.
+const DIG_W = 15, DIG_H = 24, STROKE = 3, DIG_GAP = 4, COLON_W = 7;
+export const CLOCK_W = 4 * DIG_W + 3 * DIG_GAP + COLON_W;
 // a b c d e f g → top, top-right, bottom-right, bottom, bottom-left, top-left, middle
 const SEGS: Record<string, string> = {
   "0": "abcdef", "1": "bc", "2": "abged", "3": "abgcd", "4": "fgbc",
   "5": "afgcd", "6": "afgedc", "7": "abc", "8": "abcdefg", "9": "abcdfg", "-": "g",
 };
 
-function digit(c: CanvasRenderingContext2D, ch: string, x: number, y: number, k: number) {
+function digit(c: CanvasRenderingContext2D, ch: string, x: number, y: number) {
   const on = SEGS[ch] ?? "";
-  const r = (cx: number, cy: number, w: number, h: number) => c.fillRect(x + cx * k, y + cy * k, w * k, h * k);
-  if (on.includes("a")) r(1, 0, 7, 2);
-  if (on.includes("b")) r(7, 1, 2, 5);
-  if (on.includes("c")) r(7, 7, 2, 5);
-  if (on.includes("d")) r(1, 11, 7, 2);
-  if (on.includes("e")) r(0, 7, 2, 5);
-  if (on.includes("f")) r(0, 1, 2, 5);
-  if (on.includes("g")) r(1, 5.5, 7, 2);
+  const w = DIG_W, h = DIG_H, t = STROKE;
+  const half = (h - t) / 2; // y of the middle stroke
+  // open corners: horizontals are inset by the stroke, verticals stop short
+  if (on.includes("a")) c.fillRect(x + t, y, w - 2 * t, t);
+  if (on.includes("b")) c.fillRect(x + w - t, y + 1, t, half - 1);
+  if (on.includes("c")) c.fillRect(x + w - t, y + half + t, t, half - 1);
+  if (on.includes("d")) c.fillRect(x + t, y + h - t, w - 2 * t, t);
+  if (on.includes("e")) c.fillRect(x, y + half + t, t, half - 1);
+  if (on.includes("f")) c.fillRect(x, y + 1, t, half - 1);
+  if (on.includes("g")) c.fillRect(x + t, y + half, w - 2 * t, t);
 }
 
-/** "m:ss" in segment digits; returns the width drawn. */
-function clock(c: CanvasRenderingContext2D, s: string, x: number, y: number, k: number, color: string): number {
+/** "mm:ss" in segment digits across four fixed slots; a blank leading
+ *  minute stays blank. Returns CLOCK_W. */
+function clock(c: CanvasRenderingContext2D, s: string, x: number, y: number, color: string): number {
   c.fillStyle = color;
+  const [mm, ss] = s.split(":");
+  const m = (mm ?? "").padStart(2, " ");
+  const sec = (ss ?? "").padStart(2, "0");
   let cx = x;
-  for (const ch of s) {
-    if (ch === ":") {
-      c.fillRect(cx + 1 * k, y + 3.5 * k, 2 * k, 2 * k);
-      c.fillRect(cx + 1 * k, y + 8 * k, 2 * k, 2 * k);
-      cx += 5 * k;
-    } else {
-      digit(c, ch, cx, y, k);
-      cx += (SEG_W + 2) * k;
-    }
-  }
-  return cx - x;
+  digit(c, m[0], cx, y); cx += DIG_W + DIG_GAP;
+  digit(c, m[1], cx, y); cx += DIG_W + DIG_GAP;
+  const dot = STROKE;
+  c.fillRect(cx + (COLON_W - dot) / 2, y + DIG_H * 0.3, dot, dot);
+  c.fillRect(cx + (COLON_W - dot) / 2, y + DIG_H * 0.7 - dot, dot, dot);
+  cx += COLON_W;
+  digit(c, sec[0], cx, y); cx += DIG_W + DIG_GAP;
+  digit(c, sec[1], cx, y);
+  return CLOCK_W;
 }
 
 // ---- canvases -----------------------------------------------------------------
@@ -330,9 +337,9 @@ function drawMain(dt: number) {
   }
   const t = live
     ? (() => { const e = elapsedMs(); return e === null ? "0:00" : fmtTime(e); })()
-    : state === "tuning" ? (blink ? "-:--" : "    ") : "0:00";
+    : state === "tuning" ? (blink ? "--:--" : " : ") : "0:00";
   const timeX = PAD + 12;
-  const timeW = clock(c, t.padStart(4, " "), timeX, top - 1, 2, INK);
+  const timeW = clock(c, t, timeX, top, INK);
 
   // -- readouts, two rows packed beside the time
   const kbps = player.getBitrateKbps() || player.getStation()?.bitrateKbps || 0;
