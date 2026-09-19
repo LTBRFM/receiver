@@ -99,6 +99,7 @@ export interface SourceInfo {
   reason?: string;
   aligned?: boolean;
   confidence?: number;
+  sampleRate?: number;
 }
 
 // Fire-and-forget command helper — the engine is authoritative, so a failed
@@ -139,6 +140,8 @@ let userVolume = 0.8;
 let signalFactor = 1;
 let muted = false;
 let fault: Fault | null = null;
+let sampleRate = 0;
+let bitrateKbps = 0;
 
 export function onState(cb: StateCb) { stateCbs.push(cb); }
 export function onNowPlaying(cb: TitleCb) { titleCbs.push(cb); }
@@ -157,6 +160,9 @@ export function getMuted(): boolean { return muted; }
 export function getMetadata(): Metadata | null { return metadata; }
 export function getStation(): Station | null { return station; }
 export function getFault(): Fault | null { return fault; }
+/** Stream sample rate in Hz (0 until on air) and measured bitrate in kbps. */
+export function getSampleRate(): number { return sampleRate; }
+export function getBitrateKbps(): number { return bitrateKbps; }
 
 // ---- DJ / no-DJ source -------------------------------------------------------
 //
@@ -300,6 +306,7 @@ export function initPlayer() {
 
   listen<SourceInfo>("source", (e) => {
     const s = e.payload;
+    if (s.sampleRate) sampleRate = s.sampleRate;
     if (s.phase === "switching") {
       switching = true;
     } else {
@@ -333,6 +340,7 @@ export function initPlayer() {
   });
 
   listen<SyncInfo>("sync", (e) => {
+    bitrateKbps = e.payload.bitrateKbps;
     for (const cb of syncCbs) cb(e.payload);
   });
 

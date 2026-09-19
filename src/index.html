@@ -147,6 +147,112 @@
   </div>
 </div>
 
+<!-- "Amp" face — a late-90s desktop-player skin: silver chrome, blue LCD
+     display rendered on a canvas (pixel font, time, kbps/kHz, stereo badge,
+     mini analyser, scrolling title), round transport keys and the graphic
+     equaliser docked underneath. Chrome in faces/amp/amp.css, display and
+     wiring in faces/amp/amp.ts. -->
+<div class="aunit" id="faceAmp" hidden>
+  <div class="atitle">
+    <span class="agrip"></span>
+    <span class="aname">LTBR<i>·</i>FM</span>
+    <span class="agrip"></span>
+    <button class="atbtn" id="aShade" title="Shade mode (mini)" aria-label="Shade mode">
+      <svg viewBox="0 0 8 8"><path d="M1 2h6v1H1zM2 4h4v1H2zM3 6h2v1H3z"/></svg>
+    </button>
+    <button class="atbtn" id="aClose" title="Power off" aria-label="Power off">
+      <svg viewBox="0 0 8 8"><path d="M1.5 1L7 6.5 6.5 7 1 1.5zM6.5 1L7 1.5 1.5 7 1 6.5z"/></svg>
+    </button>
+  </div>
+
+  <div class="amenu">
+    <button class="amenu-item" id="aMenuFile">File</button>
+    <button class="amenu-item" id="aMenuPlay">Play</button>
+    <button class="amenu-item" id="aMenuOptions">Options</button>
+    <button class="amenu-item" id="aMenuView">View</button>
+    <button class="amenu-item" id="aMenuHelp">Help</button>
+  </div>
+
+  <div class="amain">
+    <div class="arow">
+      <div class="alcd"><canvas id="aDisplay" height="92"></canvas></div>
+      <div class="aside">
+        <button class="asmall" id="aSideMenu" title="Window options" aria-label="Window options">
+          <svg viewBox="0 0 10 6"><path d="M1 1h8L5 5z"/></svg>
+        </button>
+        <div class="asidekey">
+          <button class="asmall apill" id="aNoDj" aria-pressed="false" title="No DJ — music and idents only (D)" aria-label="No DJ">DJ</button>
+          <span class="aled" id="aNoDjLed"></span>
+        </div>
+        <div class="asidekey">
+          <button class="asmall apill" id="aOnTop" aria-pressed="false" title="Always on top" aria-label="Always on top">TOP</button>
+          <span class="aled" id="aOnTopLed"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Track position, from the station timeline. Read-only: it is radio. -->
+    <div class="aseek" id="aSeek" title="Track position">
+      <div class="aseek-track"></div><div class="aseek-knob" id="aSeekKnob"></div>
+    </div>
+
+    <div class="atransport">
+      <div class="aroundkeys">
+        <button class="around" id="aPrev" title="Previous EQ preset" aria-label="Previous EQ preset">
+          <svg viewBox="0 0 16 16"><path d="M3 3h2v10H3zM13 3v10L6 8z"/></svg>
+        </button>
+        <button class="around aplay" id="aPlay" title="Play (Space)" aria-label="Play">
+          <svg viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z"/></svg>
+        </button>
+        <button class="around" id="aPause" title="Pause (Space)" aria-label="Pause">
+          <svg viewBox="0 0 16 16"><path d="M3 3h4v10H3zM9 3h4v10H9z"/></svg>
+        </button>
+        <button class="around" id="aStop" title="Stop" aria-label="Stop">
+          <svg viewBox="0 0 16 16"><path d="M3 3h10v10H3z"/></svg>
+        </button>
+        <button class="around" id="aNext" title="Next EQ preset" aria-label="Next EQ preset">
+          <svg viewBox="0 0 16 16"><path d="M11 3h2v10h-2zM3 3v10l7-5z"/></svg>
+        </button>
+      </div>
+      <button class="aeject" id="aMute" aria-pressed="false" title="Mute (M)" aria-label="Mute">
+        <svg viewBox="0 0 16 16"><path d="M2 6v4h3l4 3V3L5 6H2z"/><path d="M11 5.5c1.3 1 1.3 4 0 5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+      </button>
+      <div class="avol">
+        <div class="fader-h afader" id="aVol" tabindex="0" role="slider"
+             aria-label="Volume" aria-valuemin="0" aria-valuemax="100" aria-valuenow="80">
+          <div class="slot"></div><div class="cap"></div>
+        </div>
+      </div>
+      <button class="atab" id="aEqTab" aria-pressed="true" title="Graphic equaliser (E)">EQ</button>
+      <button class="abolt" id="aBolt" title="Open ltbr.fm" aria-label="Open ltbr.fm">
+        <svg viewBox="0 0 12 16"><path d="M7 0L1 9h4l-1 7 7-10H7z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="aeqpanel" id="aEqPanel">
+    <div class="aeqleft">
+      <canvas class="acurve" id="aCurve" width="72" height="30"></canvas>
+      <div class="asidekey">
+        <button class="asmall apill" id="aEqOn" aria-pressed="true" title="Equaliser on / off">ON</button>
+        <span class="aled lit" id="aEqOnLed"></span>
+      </div>
+      <button class="asmall apill" id="aEqFlat" title="Reset all bands">FLAT</button>
+    </div>
+    <div class="aeqscale" aria-hidden="true"><span>+12 dB</span><span>0 dB</span><span>-12 dB</span></div>
+    <div id="aeqSlot"></div>
+  </div>
+
+  <!-- Shade mode: the whole player folded into its title bar. -->
+  <div class="ashade">
+    <div class="ashade-lcd"><canvas id="aShadeDisplay" height="14"></canvas></div>
+    <button class="ashade-btn" id="aShadePlay" title="Play" aria-label="Play"><svg viewBox="0 0 8 8"><path d="M2 1l5 3-5 3z"/></svg></button>
+    <button class="ashade-btn" id="aShadePause" title="Pause" aria-label="Pause"><svg viewBox="0 0 8 8"><path d="M1.5 1h2v6h-2zM4.5 1h2v6h-2z"/></svg></button>
+    <button class="ashade-btn" id="aShadeStop" title="Stop" aria-label="Stop"><svg viewBox="0 0 8 8"><path d="M1.5 1.5h5v5h-5z"/></svg></button>
+    <button class="ashade-btn" id="aShadeExpand" title="Full player" aria-label="Full player"><svg viewBox="0 0 8 8"><path d="M1 6h6V5H1zM2 4h4V3H2zM3 2h2V1H3z"/></svg></button>
+  </div>
+</div>
+
 <div class="ctx" id="ctxMenu" role="menu" aria-label="Window options">
   <button class="ctx-item" id="ctxOnTop" role="menuitemcheckbox" aria-checked="false">
     <span class="ctx-led"></span>Always on Top
@@ -157,6 +263,9 @@
   </button>
   <button class="ctx-item" id="ctxFaceVintage" role="menuitemradio" aria-checked="false">
     <span class="ctx-led"></span>Face: Vintage 80s
+  </button>
+  <button class="ctx-item" id="ctxFaceAmp" role="menuitemradio" aria-checked="false">
+    <span class="ctx-led"></span>Face: Amp
   </button>
   <button class="ctx-item" id="ctxFaceMini" role="menuitemradio" aria-checked="false">
     <span class="ctx-led"></span>Face: Mini

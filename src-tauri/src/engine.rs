@@ -329,6 +329,9 @@ struct SourcePayload<'a> {
     aligned: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     confidence: Option<f32>,
+    /// The stream's sample rate, on `live` — for a readout.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sample_rate: Option<u32>,
 }
 
 fn emit_source(
@@ -337,6 +340,7 @@ fn emit_source(
     phase: &'static str,
     reason: Option<&str>,
     aligned: Option<(bool, f32)>,
+    sample_rate: Option<u32>,
 ) {
     let _ = app.emit(
         "source",
@@ -346,6 +350,7 @@ fn emit_source(
             reason,
             aligned: aligned.map(|a| a.0),
             confidence: aligned.map(|a| a.1),
+            sample_rate,
         },
     );
 }
@@ -1319,7 +1324,7 @@ fn decode_loop(
                         *url = next;
                         break DecodeOutcome::Retune;
                     }
-                    emit_source(app, &next, "switching", None, None);
+                    emit_source(app, &next, "switching", None, None, None);
                     incoming = Some(Incoming::Linking {
                         link: Link::open(&next),
                         since: sync::wall_ms(),
@@ -1363,7 +1368,7 @@ fn decode_loop(
                     );
                 }
                 Step::Failed(fault) => {
-                    emit_source(app, url, "failed", Some(&fault.message), None);
+                    emit_source(app, url, "failed", Some(&fault.message), None, None);
                 }
                 Step::Retune(next) => {
                     *url = next;
@@ -1390,7 +1395,7 @@ fn decode_loop(
         if !live {
             live = true;
             emit_state(app, "live", None);
-            emit_source(app, url, "live", None, None);
+            emit_source(app, url, "live", None, None, Some(active.rate));
             drift.first_packet(now);
         }
 
@@ -1483,7 +1488,7 @@ fn swap_in(
         emit_block(app, block, drift, last_title, info, now);
     }
 
-    emit_source(app, url, "live", None, Some(aligned));
+    emit_source(app, url, "live", None, Some(aligned), Some(active.rate));
 }
 
 // ---- audio alignment ------------------------------------------------------------

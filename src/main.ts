@@ -21,96 +21,18 @@ import {
   clearSpectrum,
 } from "./visuals.ts";
 import * as player from "./player.ts";
+import { makeFader } from "./fader.ts";
+import * as eq from "./eq.ts";
+import { FREQS, MAX_DB } from "./eq.ts";
+import { initAmp } from "./faces/amp/amp.ts";
+import "./faces/amp/amp.css";
 import { cmd } from "./player.ts";
 import { setFace, savedFace, currentFace, onFaceChange, type FaceId } from "./faces.ts";
+import * as display from "./display.ts";
+import { STATION_FALLBACK, stationName, currentLine, nextLine, faultLabel } from "./display.ts";
 import { initVintage } from "./faces/vintage/vintage.ts";
 import "./faces/vintage/vintage.css";
 
-const FREQS = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
-const MAX_DB = 12;
-
-const PRESETS: Record<string, number[]> = {
-  flat:   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  pirate: [4, 5, 2, -1, -2, 0, 2, 4, 5, 3], // scooped mids, hyped top — cassette-dub feel
-  bass:   [8, 7, 5, 2, 0, 0, 0, 0, 1, 2],
-  voice:  [-4, -3, 0, 3, 5, 5, 3, 1, -1, -2],
-};
-
-// ---- generic fader ---------------------------------------------------------
-
-interface FaderOpts {
-  min: number;
-  max: number;
-  value: number;
-  vertical: boolean;
-  onChange: (v: number) => void;
-  format?: (v: number) => string;
-}
-
-function makeFader(el: HTMLElement, opts: FaderOpts) {
-  const { min, max, value, vertical, onChange, format } = opts;
-  const cap = el.querySelector(".cap") as HTMLElement;
-  let v = value;
-
-  const paint = () => {
-    const t = (v - min) / (max - min);
-    if (vertical) cap.style.top = (1 - t) * 100 + "%";
-    else cap.style.left = t * 100 + "%";
-    el.setAttribute("aria-valuenow", String(Math.round(v)));
-    if (format) el.setAttribute("aria-valuetext", format(v));
-    onChange(v);
-  };
-
-  const setFromPointer = (e: PointerEvent) => {
-    const r = el.getBoundingClientRect();
-    const t = vertical
-      ? 1 - (e.clientY - r.top) / r.height
-      : (e.clientX - r.left) / r.width;
-    v = min + Math.max(0, Math.min(1, t)) * (max - min);
-    paint();
-  };
-
-  el.addEventListener("pointerdown", (e) => {
-    el.setPointerCapture(e.pointerId);
-    setFromPointer(e);
-    el.focus();
-  });
-  el.addEventListener("pointermove", (e) => {
-    if (el.hasPointerCapture(e.pointerId)) setFromPointer(e);
-  });
-  el.addEventListener("dblclick", () => {
-    v = min < 0 && max > 0 ? 0 : value;
-    paint();
-  });
-  el.addEventListener("keydown", (e) => {
-    const step = e.shiftKey ? (max - min) / 100 : (max - min) / 24;
-    let hit = true;
-    switch (e.key) {
-      case "ArrowUp": case "ArrowRight": v = Math.min(max, v + step); break;
-      case "ArrowDown": case "ArrowLeft": v = Math.max(min, v - step); break;
-      case "Home": v = max; break;
-      case "End": v = min; break;
-      case "PageUp": v = Math.min(max, v + (max - min) / 4); break;
-      case "PageDown": v = Math.max(min, v - (max - min) / 4); break;
-      default: hit = false;
-    }
-    if (hit) {
-      e.preventDefault();
-      paint();
-    }
-  });
-
-  paint();
-  return {
-    set(nv: number) {
-      v = nv;
-      paint();
-    },
-    get() {
-      return v;
-    },
-  };
-}
 
 // ---- volume + mute ---------------------------------------------------------
 
@@ -148,6 +70,7 @@ makeFader(preWrap.querySelector(".fader-v")!, {
       (n >= 0 ? "+" : "") + n.toFixed(1);
     preWrap.classList.toggle("active", Math.abs(n) > 0.05);
     cmd("set_preamp", { db: n });
+    eq.notePreamp(n);
   },
 });
 
@@ -170,15 +93,17 @@ FREQS.forEach((hz, i) => {
           (n >= 0 ? "+" : "") + n.toFixed(1);
         b.classList.toggle("active", Math.abs(n) > 0.05);
         cmd("set_eq_band", { index: i, db: n });
+        eq.noteBand(i, n);
       },
     }),
   );
 });
 
+eq.registerApplier((p) => p.forEach((val, i) => bandFaders[i].set(val)));
+
 document.querySelectorAll<HTMLButtonElement>("button.chip").forEach((btn) => {
   btn.addEventListener("click", () => {
-    const p = PRESETS[btn.dataset.preset!];
-    p.forEach((val, i) => bandFaders[i].set(val));
+    eq.applyPreset(btn.dataset.preset!);
     flashLine2("EQ · " + btn.textContent!.toUpperCase());
   });
 });
@@ -192,7 +117,7 @@ function openHomePage() {
   cmd("open_home_page");
 }
 
-for (const sel of [".brand", ".vbrand .vname"]) {
+for (const sel of [".brand", ".vbrand .vname", ".aname"]) {
   document.querySelectorAll<HTMLElement>(sel).forEach((el) => {
     el.classList.add("clickable");
     el.title = "Open ltbr.fm";
@@ -216,7 +141,6 @@ const btnPlay = document.getElementById("btnPlay")!;
 const icoPlay = document.getElementById("icoPlay")!;
 
 let engineState: "standby" | "tuning" | "live" | "error" = "standby";
-let nowPlaying = "";
 
 const PLAY_PATH = "M7 4l13 8-13 8z";
 const PAUSE_PATH = "M6 4h4v16H6zM14 4h4v16h-4z";
@@ -310,14 +234,6 @@ listen<{ phase: string; downloaded: number; total: number | null }>(
   },
 );
 
-function hostOf(u: string): string {
-  try {
-    return new URL(u).hostname;
-  } catch {
-    return "stream";
-  }
-}
-
 // ---- dot-matrix display -----------------------------------------------------
 //
 // Three bands. The top one is the station and its state (on air / tuning /
@@ -336,95 +252,10 @@ function hostOf(u: string): string {
 // Everything below reads from the decoded ICY payload, which the engine
 // releases in step with the audio.
 
-const STATION_FALLBACK = "LONDON TOWER BLOCK RADIO";
-const FLASH_MS = 3000;
-
-/** A fault code as a couple of dot-matrix words. */
-function faultLabel(f: player.Fault | null): string {
-  switch (f?.code) {
-    case "device": return "NO AUDIO DEVICE";
-    case "connect":
-    case "timeout":
-    case "network": return "NO CONNECTION";
-    case "http": return "STREAM OFFLINE";
-    case "decode": return "BAD SIGNAL";
-    case "dropped": return "SIGNAL LOST";
-    default: return f ? "FAULT" : "";
-  }
-}
-
-let flashText = "";
-let flashUntil = 0;
-
 /** Take the current-track line for a few seconds, then let it resume. */
 function flashLine2(text: string) {
-  flashText = text;
-  flashUntil = Date.now() + FLASH_MS;
+  display.flash(text);
   renderDisplay();
-}
-
-function stationName(): string {
-  return player.getStation()?.name || STATION_FALLBACK;
-}
-
-/** "ARTIST - TITLE", falling back to whichever half exists. */
-function segmentLabel(seg: player.Segment): string {
-  const artist = seg.artist?.trim();
-  const title = seg.title?.trim();
-  if (artist && title) return `${artist} - ${title}`;
-  return title || artist || "";
-}
-
-/** Markers are on the station timeline, so "live" means the interpolated
- *  listener position falls inside them. */
-function activeMarker<T extends { startMs: number; durationMs: number }>(
-  markers: T[],
-  now: number | null,
-): T | undefined {
-  if (now === null) return undefined;
-  return markers.find((m) => now >= m.startMs && now < m.startMs + m.durationMs);
-}
-
-/** What you are hearing right now: a transient notice if one applies, else
- *  the current track, else whatever fallback title we last saw. */
-function currentLine(): string {
-  if (Date.now() < flashUntil) return flashText;
-
-  const meta = player.getMetadata();
-  if (meta) {
-    const now = player.timelineMs();
-    const talk = activeMarker(meta.talk, now);
-    if (talk || meta.kind === "talk") {
-      const dj = talk?.dj || meta.programme?.dj;
-      return dj ? `DJ ON AIR · ${dj}` : "DJ ON AIR";
-    }
-    // Jingle names are raw asset slugs (LTBR_FM_All_Day_..._01), so they are
-    // never shown verbatim.
-    if (activeMarker(meta.jingles, now) || meta.kind === "jingle") {
-      return "STATION IDENT";
-    }
-    const label = meta.now ? segmentLabel(meta.now) : "";
-    if (label) return label;
-  }
-  return nowPlaying || hostOf(player.currentUrl());
-}
-
-/** "NEXT: artist - track", or a placeholder when told nothing, or empty when
- *  the station simply has no schedule data. No countdown here on purpose —
- *  a timer changes every second, which would keep resetting the scroll. */
-function nextLine(): string {
-  const meta = player.getMetadata();
-  if (!meta) return "";
-
-  const next = meta.next[0];
-  if (next) {
-    const label = segmentLabel(next);
-    if (label) return `NEXT: ${label}`;
-  } else if (meta.scheduleTruncated) {
-    // Told nothing, rather than told there is nothing.
-    return "NEXT: —";
-  }
-  return "";
 }
 
 function renderDisplay() {
@@ -616,7 +447,7 @@ function setMinimized(v: boolean) {
 document.addEventListener("keydown", (e) => {
   const t = e.target as HTMLElement;
   if (t.matches("input, [role=slider]")) return;
-  if (e.code === "Space" && currentFace() === "default") {
+  if (e.code === "Space" && currentFace() !== "vintage") {
     e.preventDefault();
     if (engineState === "live" || engineState === "tuning") pause();
     else play();
@@ -709,13 +540,15 @@ ctxOnTop.addEventListener("click", () => {
 
 const ctxFaceDefault = document.getElementById("ctxFaceDefault")!;
 const ctxFaceVintage = document.getElementById("ctxFaceVintage")!;
+const ctxFaceAmp = document.getElementById("ctxFaceAmp")!;
 const ctxFaceMini = document.getElementById("ctxFaceMini")!;
 
-// One radio group of three. Mini is not a base face of its own — it wears
+// One radio group of four. Mini is not a base face of its own — it wears
 // whichever fascia is underneath — so it simply wins the tick while it is on.
 function refreshFaceChecks(f: FaceId) {
   ctxFaceDefault.setAttribute("aria-checked", String(f === "default" && !minimized));
   ctxFaceVintage.setAttribute("aria-checked", String(f === "vintage" && !minimized));
+  ctxFaceAmp.setAttribute("aria-checked", String(f === "amp" && !minimized));
   ctxFaceMini.setAttribute("aria-checked", String(minimized));
 }
 
@@ -728,6 +561,7 @@ function chooseFace(f: FaceId) {
 
 ctxFaceDefault.addEventListener("click", () => chooseFace("default"));
 ctxFaceVintage.addEventListener("click", () => chooseFace("vintage"));
+ctxFaceAmp.addEventListener("click", () => chooseFace("amp"));
 ctxFaceMini.addEventListener("click", () => {
   setMinimized(true);
   closeCtxMenu();
@@ -766,12 +600,10 @@ onFaceChange((f) => {
 // ---- engine events ---------------------------------------------------------
 
 player.onState((s) => {
-  nowPlaying = player.getNowPlaying();
   applyState(s);
 });
 
-player.onNowPlaying((title) => {
-  nowPlaying = title;
+player.onNowPlaying(() => {
   if (engineState === "live") applyState("live");
 });
 
@@ -820,9 +652,9 @@ player.onSpectrum((bars) => setSpectrum(bars));
 // bundled fonts have finished loading.
 async function fitWindow() {
   await document.fonts.ready;
-  const root = currentFace() === "vintage"
-    ? document.getElementById("faceVintage")!
-    : document.getElementById("faceDefault")!;
+  const root = document.getElementById(
+    { default: "faceDefault", vintage: "faceVintage", amp: "faceAmp" }[currentFace()],
+  )!;
   const w = Math.ceil(root.offsetWidth);
   const h = Math.ceil(root.offsetHeight);
   if (!w || !h) return; // hidden or not laid out yet — nothing to trust
@@ -834,6 +666,7 @@ async function fitWindow() {
 player.initPlayer();
 initVisuals();
 initVintage();
+initAmp();
 btnNoDj.setAttribute("aria-pressed", String(player.getNoDj()));
 setFace(savedFace());
 setMinimized(savedMinimized(currentFace()));
@@ -853,3 +686,4 @@ const refit = new ResizeObserver(() => {
 });
 refit.observe(document.querySelector(".face")!);
 refit.observe(document.getElementById("faceVintage")!);
+refit.observe(document.getElementById("faceAmp")!);

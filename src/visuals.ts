@@ -134,7 +134,7 @@ function drawSpectrum() {
 // WebKitGTK, CoreText and DirectWrite. A bitmap font is deterministic:
 // identical dots on every OS, like a real dot-matrix display.
 
-const ROWS = 7;
+export const ROWS = 7;
 const GLYPH_W = 5;
 const GLYPH_STEP = 6; // 5 columns + 1 blank spacing column
 
@@ -208,8 +208,10 @@ const ALIASES: Record<string, string> = {
   "–": "-", "—": "-", "•": "·", "…": ".",
 };
 
-function rasterise(text: string): { bits: Uint8Array; w: number } {
-  const t = "   " + text + "   ";
+/** Rasterise text in the built-in 5x7 dot font: one byte per cell, `w`
+ *  cells wide, ROWS tall. `pad` blank cells are added either side. */
+export function rasterise(text: string, pad = 3): { bits: Uint8Array; w: number } {
+  const t = " ".repeat(pad) + text + " ".repeat(pad);
   // Uppercase and strip diacritics so e.g. "Édith" renders as "EDITH";
   // anything still unknown becomes a blank cell.
   const chars = Array.from(

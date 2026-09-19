@@ -37,6 +37,9 @@ pub struct Controls {
     preamp_db: AtomicU32,
     volume: AtomicU32,
     muted: AtomicBool,
+    /// EQ bypass: when false every band glides to 0 dB while the slider
+    /// positions are kept, so switching back restores the curve.
+    eq_enabled: AtomicBool,
 }
 
 impl Default for Controls {
@@ -46,6 +49,7 @@ impl Default for Controls {
             preamp_db: AtomicU32::new(0f32.to_bits()),
             volume: AtomicU32::new(0.8f32.to_bits()),
             muted: AtomicBool::new(false),
+            eq_enabled: AtomicBool::new(true),
         }
     }
 }
@@ -66,8 +70,14 @@ impl Controls {
     pub fn set_muted(&self, m: bool) {
         self.muted.store(m, Ordering::Relaxed);
     }
+    pub fn set_eq_enabled(&self, on: bool) {
+        self.eq_enabled.store(on, Ordering::Relaxed);
+    }
 
     fn band(&self, i: usize) -> f32 {
+        if !self.eq_enabled.load(Ordering::Relaxed) {
+            return 0.0;
+        }
         f32::from_bits(self.band_db[i].load(Ordering::Relaxed))
     }
     fn preamp(&self) -> f32 {

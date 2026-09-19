@@ -59,6 +59,11 @@ fn set_preamp(engine: State<Engine>, db: f32) {
 }
 
 #[tauri::command]
+fn set_eq_enabled(engine: State<Engine>, enabled: bool) {
+    engine.controls().set_eq_enabled(enabled);
+}
+
+#[tauri::command]
 fn apply_preset(engine: State<Engine>, name: String) {
     if let Some((_, gains)) = PRESETS.iter().find(|(n, _)| *n == name) {
         for (i, g) in gains.iter().enumerate() {
@@ -111,6 +116,7 @@ pub fn run() {
             set_mute,
             set_eq_band,
             set_preamp,
+            set_eq_enabled,
             apply_preset,
             open_download_page,
             open_home_page,

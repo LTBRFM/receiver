@@ -45,12 +45,15 @@ desktop counterpart, downloadable from the same page.
   crashes the app. Faults show as a few words on the dot-matrix display (or
   a pilot lamp on the vintage face) with the full reason in a tooltip — never
   as a line of error text on the fascia.
-- **Three faces.** Right-click → **Face** switches between the default rack
-  unit, a **Vintage 80s** UK receiver — a backlit tuning dial with a real
+- **Four faces.** Right-click → **Face** switches between the default rack
+  unit; a **Vintage 80s** UK receiver — a backlit tuning dial with a real
   analogue feel, turn the knob through inter-station static until LTBR·FM
-  locks in, plus twin VU meters and rotary volume — and **Mini**, a compact
-  strip about a quarter of the footprint that keeps playing while the chrome
-  tucks away. The choice is remembered.
+  locks in, plus twin VU meters and rotary volume; **Amp**, a late-90s
+  desktop-player skin — silver chrome, a blue pixel LCD with time, kbps/kHz,
+  STEREO badge, mini analyser and scrolling title, round transport keys and
+  the equaliser docked underneath, with a "shade" mode that folds it into a
+  bar; and **Mini**, a compact strip about a quarter of the footprint that
+  keeps playing while the chrome tucks away. The choice is remembered.
 
 Streams: `https://stream.ltbr.fm/live` (with DJ) and
 `https://stream.ltbr.fm/live-nodj` (without) — the **NO DJ** key picks
@@ -80,7 +83,11 @@ Source map:
 | Area | File |
 | --- | --- |
 | UI wiring / IPC | `src/main.ts` |
+| Display wording shared by faces | `src/display.ts` |
+| Equaliser model (presets, on/off) | `src/eq.ts` |
 | Canvas scroller + spectrum | `src/visuals.ts` |
+| Vintage 80s face | `src/faces/vintage/` |
+| Amp face (blue LCD skin) | `src/faces/amp/` |
 | EQ / preamp / volume DSP | `src-tauri/src/dsp.rs` |
 | Spectrum FFT | `src-tauri/src/spectrum.rs` |
 | Network + ICY demux, byte cursors | `src-tauri/src/stream.rs` |
